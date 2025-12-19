@@ -107,7 +107,7 @@ export default function POS() {
 
   const generateSaleNumber = () => {
     const timestamp = Date.now().toString().slice(-6);
-    return `SALE-${timestamp}`;
+    return `SALE-KSh{timestamp}`;
   };
 
   const completeSale = async () => {
@@ -162,7 +162,7 @@ export default function POS() {
             movement_type: 'SALE',
             quantity: -item.quantity,
             reference_id: saleData.id,
-            notes: `Sale ${saleNumber}`,
+            notes: `Sale KSh{saleNumber}`,
           },
         ]);
       }
@@ -282,7 +282,7 @@ export default function POS() {
                     <h4 className="font-semibold text-slate-800">{product.name}</h4>
                     <p className="text-sm text-slate-600">{product.category}</p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-lg font-bold text-amber-600">${product.selling_price.toFixed(2)}</span>
+                      <span className="text-lg font-bold text-amber-600">KSh{product.selling_price.toFixed(2)}</span>
                       <span className="text-xs text-slate-500">
                         Stock: {product.current_stock} {product.unit}
                       </span>
@@ -311,7 +311,7 @@ export default function POS() {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <p className="font-medium text-slate-800">{item.product.name}</p>
-                        <p className="text-sm text-slate-600">${item.product.selling_price.toFixed(2)} each</p>
+                        <p className="text-sm text-slate-600">KSh{item.product.selling_price.toFixed(2)} each</p>
                       </div>
                       <button
                         onClick={() => removeFromCart(item.product.id)}
@@ -336,7 +336,7 @@ export default function POS() {
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
-                      <span className="font-semibold text-slate-800">${item.subtotal.toFixed(2)}</span>
+                      <span className="font-semibold text-slate-800">KSh{item.subtotal.toFixed(2)}</span>
                     </div>
                   </div>
                 ))
@@ -346,7 +346,7 @@ export default function POS() {
             <div className="border-t border-slate-200 pt-4 space-y-3">
               <div className="flex items-center justify-between text-lg font-bold">
                 <span className="text-slate-800">Total:</span>
-                <span className="text-amber-600">${calculateTotal().toFixed(2)}</span>
+                <span className="text-amber-600">KSh{calculateTotal().toFixed(2)}</span>
               </div>
 
               <input
@@ -362,7 +362,7 @@ export default function POS() {
                 <div className="grid grid-cols-4 gap-2">
                   <button
                     onClick={() => setPaymentMethod('Cash')}
-                    className={`p-2 rounded-lg border-2 transition-all ${
+                    className={`p-2 rounded-lg border-2 transition-all KSh{
                       paymentMethod === 'Cash'
                         ? 'border-amber-500 bg-amber-50'
                         : 'border-slate-200 hover:border-slate-300'
@@ -373,7 +373,7 @@ export default function POS() {
                   </button>
                   <button
                     onClick={() => setPaymentMethod('Card')}
-                    className={`p-2 rounded-lg border-2 transition-all ${
+                    className={`p-2 rounded-lg border-2 transition-all KSh{
                       paymentMethod === 'Card'
                         ? 'border-amber-500 bg-amber-50'
                         : 'border-slate-200 hover:border-slate-300'
@@ -384,7 +384,7 @@ export default function POS() {
                   </button>
                   <button
                     onClick={() => setPaymentMethod('Mobile Money')}
-                    className={`p-2 rounded-lg border-2 transition-all ${
+                    className={`p-2 rounded-lg border-2 transition-all KSh{
                       paymentMethod === 'Mobile Money'
                         ? 'border-amber-500 bg-amber-50'
                         : 'border-slate-200 hover:border-slate-300'
@@ -433,7 +433,7 @@ export default function POS() {
             <div className="p-8 text-center space-y-4">
               <div className="bg-green-50 rounded-lg p-6">
                 <p className="text-sm text-slate-600 mb-2">Amount to Pay</p>
-                <p className="text-4xl font-bold text-green-600">${mpesaAmount}</p>
+                <p className="text-4xl font-bold text-green-600">KSh{mpesaAmount}</p>
               </div>
 
               <div className="bg-slate-50 rounded-lg p-4 text-left">
@@ -536,8 +536,8 @@ export default function POS() {
                       <tr key={item.product.id} className="border-b border-slate-200">
                         <td className="py-1">{item.product.name}</td>
                         <td className="text-center py-1">{item.quantity}</td>
-                        <td className="text-right py-1">${item.product.selling_price.toFixed(2)}</td>
-                        <td className="text-right py-1">${item.subtotal.toFixed(2)}</td>
+                        <td className="text-right py-1">KSh{item.product.selling_price.toFixed(2)}</td>
+                        <td className="text-right py-1">KSh{item.subtotal.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -547,7 +547,7 @@ export default function POS() {
               <div className="border-t border-slate-300 pt-2 mb-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>TOTAL:</span>
-                  <span>${parseFloat(lastSale.total_amount).toFixed(2)}</span>
+                  <span>KSh{parseFloat(lastSale.total_amount).toFixed(2)}</span>
                 </div>
               </div>
 
