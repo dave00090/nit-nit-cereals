@@ -77,11 +77,11 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-slate-600">{title}</p>
-          <p className={`text-3xl font-bold mt-2 KSh{color}`}>{value}</p>
+          <p className={`text-3xl font-bold mt-2 ${color}`}>{value}</p>
           {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
         </div>
-        <div className={`w-12 h-12 rounded-lg flex items-center justify-center KSh{color.replace('text-', 'bg-').replace('600', '100')}`}>
-          <Icon className={`w-6 h-6 KSh{color}`} />
+        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color.replace('text-', 'bg-').replace('600', '100')}`}>
+          <Icon className={`w-6 h-6 ${color}`} />
         </div>
       </div>
     </div>
@@ -110,7 +110,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Today's Revenue"
-          value={`KShKSh{stats.totalRevenue.toFixed(2)}`}
+          value={`$${stats.totalRevenue.toFixed(2)}`}
           icon={DollarSign}
           color="text-green-600"
           subtitle="Total sales today"
@@ -124,7 +124,7 @@ export default function Dashboard() {
         />
         <StatCard
           title="Today's Expenses"
-          value={`KShKSh{stats.totalExpenses.toFixed(2)}`}
+          value={`$${stats.totalExpenses.toFixed(2)}`}
           icon={TrendingDown}
           color="text-red-600"
           subtitle="Total spent today"
@@ -180,7 +180,7 @@ export default function Dashboard() {
                       {sale.customer_name || 'Walk-in Customer'} • {new Date(sale.created_at).toLocaleTimeString()}
                     </p>
                   </div>
-                  <span className="font-semibold text-green-600">KSh{parseFloat(sale.total_amount).toFixed(2)}</span>
+                  <span className="font-semibold text-green-600">${parseFloat(sale.total_amount).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -190,7 +190,7 @@ export default function Dashboard() {
 
       <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl shadow-md p-6 text-white">
         <h3 className="text-xl font-bold mb-2">Net Profit Today</h3>
-        <p className="text-4xl font-bold">KSh{(stats.totalRevenue - stats.totalExpenses).toFixed(2)}</p>
+        <p className="text-4xl font-bold">${(stats.totalRevenue - stats.totalExpenses).toFixed(2)}</p>
         <p className="text-sm opacity-90 mt-2">Revenue minus expenses</p>
       </div>
     </div>
