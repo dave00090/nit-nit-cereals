@@ -495,7 +495,7 @@ export default function POS() {
 
             <div ref={receiptRef} className="p-6 font-mono text-sm">
               <div className="text-center mb-4">
-                <h2 className="text-xl font-bold">CEREALS SHOP</h2>
+                <h2 className="text-xl font-bold">NIT-NIT CEREALS & SHOP</h2>
                 <p className="text-xs text-slate-600">Management System</p>
                 <p className="text-xs text-slate-600 mt-1">Receipt</p>
               </div>

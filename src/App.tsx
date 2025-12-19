@@ -46,7 +46,7 @@ function App() {
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-800">Cereals Shop</h1>
+                <h1 className="text-xl font-bold text-slate-800">Nit-Nit Cereals Shop</h1>
                 <p className="text-xs text-slate-500">Management System</p>
               </div>
             </div>
