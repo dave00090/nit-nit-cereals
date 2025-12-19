@@ -9,12 +9,12 @@ import {
   Settings,
   LogOut
 } from 'lucide-react';
-import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import POS from './pages/POS';
-import Reports from './pages/Reports';
-import Expenses from './pages/Expenses';
-import Distributors from './pages/Distributors'; // Import the new page
+import Dashboard from './components/Dashboard';
+import Inventory from './components/Inventory';
+import POS from './components/POS';
+import Reports from './components/Reports';
+import Expenses from './components/Expenses';
+import Distributors from './components/Distributors'; // Import the new page
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
