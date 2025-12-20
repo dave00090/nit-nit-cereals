@@ -45,7 +45,7 @@ serve(async (req) => {
         Password: password,
         Timestamp: timestamp,
         TransactionType: "CustomerPayBillOnline",
-        Amount: Math.round(amount),
+        Amount: Math.round(Number(amount)),
         PartyA: phone,
         PartyB: shortCode,
         PhoneNumber: phone,

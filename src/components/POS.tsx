@@ -1,145 +1,249 @@
 import { useEffect, useState } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, Smartphone, Loader2, CheckCircle2, Receipt, X } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Smartphone, Loader2, CheckCircle2, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Product } from '../lib/types';
+import { Product, CartItem } from '../lib/types';
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [cart, setCart] = useState<any[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'M-Pesa'>('Cash');
+  const [loading, setLoading] = useState(true);
   
-  // M-Pesa States
+  // M-Pesa Specific States
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [checkoutId, setCheckoutId] = useState<string | null>(null);
+  const [isProcessingMpesa, setIsProcessingMpesa] = useState(false);
   const [mpesaReceipt, setMpesaReceipt] = useState<string | null>(null);
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
   // REAL-TIME LISTENER
   useEffect(() => {
     if (!checkoutId) return;
 
-    // Listen for the entry in mpesa_callbacks matching our checkoutId
     const channel = supabase
-      .channel('mpesa-watch')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'mpesa_callbacks', filter: `checkout_request_id=eq.${checkoutId}` }, 
+      .channel('mpesa-confirm')
+      .on(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'mpesa_callbacks', 
+          filter: `checkout_request_id=eq.${checkoutId}` 
+        },
         (payload) => {
           if (payload.new.result_code === 0) {
             setMpesaReceipt(payload.new.mpesa_receipt_number);
-            setIsProcessing(false);
+            setIsProcessingMpesa(false);
           } else {
-            alert("Payment Cancelled or Failed: " + payload.new.result_desc);
-            setIsProcessing(false);
+            alert("Payment Failed: " + payload.new.result_desc);
+            setIsProcessingMpesa(false);
             setCheckoutId(null);
           }
         }
-      ).subscribe();
+      )
+      .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [checkoutId]);
 
   const loadProducts = async () => {
+    setLoading(true);
     const { data } = await supabase.from('products').select('*').order('name');
     setProducts(data || []);
+    setLoading(false);
   };
 
-  const calculateTotal = () => cart.reduce((sum, item) => sum + item.selling_price * item.quantity, 0);
+  const addToCart = (product: Product) => {
+    const existingItem = cart.find(item => item.product.id === product.id);
+    if (existingItem) {
+      setCart(cart.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.product.selling_price } : item));
+    } else {
+      setCart([...cart, { product, quantity: 1, subtotal: product.selling_price }]);
+    }
+  };
 
+  const updateQty = (id: string, delta: number) => {
+    setCart(cart.map(item => {
+      if (item.product.id === id) {
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty, subtotal: newQty * item.product.selling_price };
+      }
+      return item;
+    }));
+  };
+
+  const calculateTotal = () => cart.reduce((sum, item) => sum + item.subtotal, 0);
+
+  // TRIGGER THE M-PESA STK PUSH
   const handleMpesaPush = async () => {
-    if (!phoneNumber) return alert("Enter Phone Number");
-    setIsProcessing(true);
+    const total = calculateTotal();
+    
+    // Safety Checks
+    if (total < 1) return alert("Total must be at least 1 KES");
+    if (!phoneNumber) return alert("Please enter a phone number");
+    
+    // Clean phone number to 2547XXXXXXXX format
+    let cleanPhone = phoneNumber.replace(/\s+/g, '').replace('+', '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '254' + cleanPhone.substring(1);
+    }
+    
+    setIsProcessingMpesa(true);
     setMpesaReceipt(null);
 
-    const { data, error } = await supabase.functions.invoke('mpesa-stk-push', {
-      body: { phone: phoneNumber, amount: calculateTotal() }
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('mpesa-stk-push', {
+        body: { 
+          phone: cleanPhone, 
+          amount: Math.round(total) // Ensure it's a whole number for Safaricom
+        }
+      });
 
-    if (error) {
-      alert("Error triggering push");
-      setIsProcessing(false);
-    } else {
-      setCheckoutId(data.CheckoutRequestID); // Store this to start listening
+      if (error) throw error;
+      
+      if (data.ResponseCode === "0") {
+        setCheckoutId(data.CheckoutRequestID);
+      } else {
+        throw new Error(data.CustomerMessage || "Push failed");
+      }
+
+    } catch (err: any) {
+      console.error("M-Pesa Error:", err);
+      alert(`Error: ${err.message || "Could not trigger M-Pesa push"}`);
+      setIsProcessingMpesa(false);
     }
   };
 
   const handleCompleteSale = async () => {
+    if (cart.length === 0) return;
     const total = calculateTotal();
-    const { data: sale } = await supabase.from('sales').insert([{
+
+    const { data: sale, error } = await supabase.from('sales').insert([{
       sale_number: `SALE-${Date.now()}`,
       total_amount: total,
       payment_method: paymentMethod,
-      mpesa_receipt_number: mpesaReceipt // Save the code in the sale record
+      mpesa_receipt_number: mpesaReceipt
     }]).select().single();
 
+    if (error) return alert("Sale completion failed");
+
+    alert(`Sale Completed! Receipt: ${mpesaReceipt || 'N/A'}`);
     setCart([]);
     setMpesaReceipt(null);
     setCheckoutId(null);
-    alert("Sale Completed Successfully!");
+    setPhoneNumber('');
   };
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6 p-4">
-      {/* Product List */}
-      <div className="flex-1 space-y-4">
-        <input type="text" placeholder="Search..." className="w-full p-2 border rounded-lg" onChange={e => setSearchTerm(e.target.value)} />
-        <div className="grid grid-cols-3 gap-4">
+      {/* Product Selection */}
+      <div className="flex-1 flex flex-col gap-4">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
+          <Search className="text-slate-400 w-5 h-5" />
+          <input 
+            type="text" placeholder="Search products..." 
+            className="w-full outline-none" 
+            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto">
           {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => (
-            <button key={product.id} onClick={() => setCart([...cart, {...product, quantity: 1}])} className="bg-white p-4 border rounded-xl text-left">
-              <p className="font-bold">{product.name}</p>
-              <p className="text-amber-600 font-bold">$ {product.selling_price.toFixed(2)}</p>
+            <button key={product.id} onClick={() => addToCart(product)} className="bg-white p-4 rounded-xl border border-slate-200 hover:border-amber-500 transition-colors text-left group shadow-sm">
+              <p className="font-bold text-slate-800 group-hover:text-amber-600 truncate">{product.name}</p>
+              <p className="text-amber-600 font-bold mt-1">KES {product.selling_price.toLocaleString()}</p>
+              <p className="text-[10px] text-slate-400 mt-2 uppercase">Stock: {product.stock_quantity}</p>
             </button>
           ))}
         </div>
       </div>
 
       {/* Cart Sidebar */}
-      <div className="w-96 bg-white border rounded-xl flex flex-col shadow-lg">
-        <div className="p-4 border-b font-bold bg-slate-50">Current Order</div>
+      <div className="w-96 bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden">
+        <div className="p-4 border-b font-bold bg-slate-50 text-slate-700 flex items-center gap-2">
+          <ShoppingCart className="w-5 h-5 text-amber-500"/> Current Order
+        </div>
+
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {cart.map((item, idx) => (
-            <div key={idx} className="flex justify-between border-b pb-2">
-              <span className="text-sm font-medium">{item.name}</span>
-              <span className="font-bold">$ {item.selling_price.toFixed(2)}</span>
+          {cart.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50">
+              <ShoppingCart className="w-12 h-12 mb-2" />
+              <p>Cart is empty</p>
             </div>
-          ))}
+          ) : (
+            cart.map(item => (
+              <div key={item.product.id} className="pb-3 border-b border-slate-100 flex justify-between items-center">
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-700">{item.product.name}</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <button onClick={() => updateQty(item.product.id, -1)} className="p-1 border rounded hover:bg-slate-50"><Minus className="w-3 h-3"/></button>
+                    <span className="text-sm font-black">{item.quantity}</span>
+                    <button onClick={() => updateQty(item.product.id, 1)} className="p-1 border rounded hover:bg-slate-50"><Plus className="w-3 h-3"/></button>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm text-slate-800">KES {item.subtotal.toLocaleString()}</p>
+                  <button onClick={() => setCart(cart.filter(c => c.product.id !== item.product.id))} className="text-red-400 hover:text-red-600 mt-1"><Trash2 className="w-4 h-4"/></button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="p-4 bg-slate-50 border-t space-y-4">
-          <div className="flex gap-2">
-            <button onClick={() => setPaymentMethod('Cash')} className={`flex-1 py-2 rounded border font-bold ${paymentMethod === 'Cash' ? 'bg-amber-500 text-white' : 'bg-white'}`}>Cash</button>
-            <button onClick={() => setPaymentMethod('M-Pesa')} className={`flex-1 py-2 rounded border font-bold ${paymentMethod === 'M-Pesa' ? 'bg-green-600 text-white' : 'bg-white'}`}>M-Pesa</button>
+          <div className="flex gap-2 p-1 bg-white rounded-lg border">
+            <button onClick={() => setPaymentMethod('Cash')} className={`flex-1 py-2 rounded-md font-bold text-sm transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500'}`}>Cash</button>
+            <button onClick={() => setPaymentMethod('M-Pesa')} className={`flex-1 py-2 rounded-md font-bold text-sm transition-all ${paymentMethod === 'M-Pesa' ? 'bg-green-600 text-white shadow-md' : 'text-slate-500'}`}>M-Pesa</button>
           </div>
 
           {paymentMethod === 'M-Pesa' && (
-            <div className="p-3 bg-white border border-green-200 rounded-lg">
+            <div className="p-4 bg-white border border-green-200 rounded-xl space-y-3 shadow-inner">
               {mpesaReceipt ? (
-                <div className="flex items-center gap-2 text-green-700 font-bold">
-                  <CheckCircle2 className="w-5 h-5" /> Code: {mpesaReceipt}
+                <div className="flex items-center gap-3 text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                  <CheckCircle2 className="w-8 h-8" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider">M-Pesa Confirmed</p>
+                    <p className="font-black text-xl leading-none">{mpesaReceipt}</p>
+                  </div>
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <input type="text" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} className="flex-1 border-b outline-none font-bold" placeholder="07XXXXXXXX" />
-                  <button onClick={handleMpesaPush} disabled={isProcessing} className="bg-green-600 text-white p-2 rounded">
-                    {isProcessing ? <Loader2 className="animate-spin w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
-                  </button>
-                </div>
+                <>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Phone</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} 
+                      className="flex-1 font-bold outline-none border-b-2 border-slate-100 focus:border-green-500 py-1" 
+                      placeholder="2547XXXXXXXX" 
+                    />
+                    <button 
+                      onClick={handleMpesaPush} 
+                      disabled={isProcessingMpesa || cart.length === 0} 
+                      className="bg-green-600 text-white p-2 rounded-lg disabled:bg-slate-300"
+                    >
+                      {isProcessingMpesa ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {isProcessingMpesa && <p className="text-[10px] text-green-600 font-bold animate-pulse">Check phone for PIN prompt...</p>}
+                </>
               )}
             </div>
           )}
 
-          <div className="flex justify-between text-xl font-bold">
-            <span>Total</span><span>$ {calculateTotal().toFixed(2)}</span>
+          <div className="flex justify-between items-end">
+            <span className="text-slate-500 font-medium">Total</span>
+            <span className="text-2xl font-black text-slate-900">KES {calculateTotal().toLocaleString()}</span>
           </div>
 
           <button 
             onClick={handleCompleteSale} 
-            disabled={cart.length === 0 || (paymentMethod === 'M-Pesa' && !mpesaReceipt)}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50"
+            disabled={cart.length === 0 || (paymentMethod === 'M-Pesa' && !mpesaReceipt)} 
+            className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-lg shadow-lg disabled:opacity-30"
           >
-            Complete Transaction
+            COMPLETE SALE
           </button>
         </div>
       </div>
