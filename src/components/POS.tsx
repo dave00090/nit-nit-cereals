@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Search, ShoppingCart, Trash2, Plus, Minus, 
-  CheckCircle, Loader2, Barcode, Wallet 
+  CheckCircle, Loader2, Barcode, Wallet, Printer, CreditCard, Banknote
 } from 'lucide-react';
 
 export default function POS() {
@@ -11,6 +11,7 @@ export default function POS() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'M-Pesa'>('Cash');
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -58,7 +59,6 @@ export default function POS() {
     setCart(cart.map(item => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
-        // Prevent quantity from exceeding available stock
         if (delta > 0 && newQty > item.current_stock) {
             alert("Cannot exceed available stock");
             return item;
@@ -71,22 +71,71 @@ export default function POS() {
 
   const total = cart.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
 
-  // --- THE FIXED COMPLETE SALE LOGIC ---
+  // --- UPDATED RECEIPT GENERATION ---
+  const printReceipt = (saleItems: any[], saleTotal: number, method: string) => {
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) return;
+
+    const itemsHtml = saleItems.map(item => `
+      <tr>
+        <td style="padding: 5px 0;">${item.name} x${item.quantity}</td>
+        <td style="text-align: right;">KES ${(item.selling_price * item.quantity).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt - Nit-Nit Cereals</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; padding: 20px; color: #333; line-height: 1.2; }
+            .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; }
+            table { width: 100%; margin: 20px 0; border-collapse: collapse; }
+            .total { border-top: 2px dashed #000; padding-top: 10px; font-weight: bold; }
+            .method { margin-top: 5px; font-size: 0.9em; font-weight: normal; }
+            .footer { text-align: center; margin-top: 30px; font-size: 0.8em; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>NIT-NIT CEREALS</h2>
+            <p>Quality You Can Trust</p>
+            <p>${new Date().toLocaleString()}</p>
+          </div>
+          <table>
+            ${itemsHtml}
+          </table>
+          <div class="total">
+            <div style="display: flex; justify-content: space-between; font-size: 1.2em;">
+              <span>TOTAL:</span>
+              <span>KES ${saleTotal.toLocaleString()}</span>
+            </div>
+            <div class="method">Payment Method: ${method}</div>
+          </div>
+          <div class="footer">
+            <p>Thank you for shopping with us!</p>
+            <p>Goods once sold are not returnable.</p>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const completeSale = async () => {
     if (cart.length === 0) return;
     setIsProcessing(true);
 
     try {
-      // 1. Insert into Sales Table
       const { error: saleError } = await supabase.from('sales').insert([{
         items: cart,
         total_amount: total,
-        payment_method: 'Cash'
+        payment_method: paymentMethod
       }]);
 
       if (saleError) throw saleError;
 
-      // 2. Loop through cart and deduct stock from 'products' table
       const stockUpdates = cart.map(item => {
         return supabase
           .from('products')
@@ -94,16 +143,14 @@ export default function POS() {
           .eq('id', item.id);
       });
 
-      const results = await Promise.all(stockUpdates);
-      const updateError = results.find(r => r.error);
-      if (updateError) throw updateError.error;
+      await Promise.all(stockUpdates);
+      
+      printReceipt(cart, total, paymentMethod);
 
-      // 3. Success Actions
-      alert("Sale Completed Successfully!");
       setCart([]);
-      fetchProducts(); // Refresh stock levels to show updated counts
+      fetchProducts(); 
+      setPaymentMethod('Cash'); // Reset to default
     } catch (error: any) {
-      console.error("Sale Error:", error);
       alert("Sale Failed: " + error.message);
     } finally {
       setIsProcessing(false);
@@ -152,21 +199,21 @@ export default function POS() {
           <div className="bg-amber-500 p-3 rounded-2xl text-slate-900">
             <ShoppingCart size={24} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase">Cart</h2>
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Current Cart</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2">
           {cart.length === 0 && (
             <div className="text-center py-20 opacity-20">
-              <ShoppingCart size={64} className="mx-auto mb-4" />
-              <p className="font-black uppercase tracking-widest text-xs">Waiting for items...</p>
+              <ShoppingCart size={64} className="mx-auto mb-4 text-slate-300" />
+              <p className="font-black uppercase tracking-widest text-xs">Ready for Sale</p>
             </div>
           )}
           {cart.map(item => (
             <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="flex-1 min-w-0 mr-4">
                 <p className="font-black text-slate-900 text-sm uppercase truncate">{item.name}</p>
-                <p className="text-[10px] font-bold text-slate-400 italic">KES {item.selling_price}</p>
+                <p className="text-[10px] font-bold text-slate-400 italic font-mono">KES {item.selling_price}</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-slate-200">
@@ -174,10 +221,29 @@ export default function POS() {
                     <span className="font-black text-slate-900 min-w-[20px] text-center">{item.quantity}</span>
                     <button onClick={() => updateQuantity(item.id, 1)} className="text-slate-400 hover:text-slate-900"><Plus size={14}/></button>
                 </div>
-                <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={18}/></button>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* PAYMENT METHOD SELECTOR */}
+        <div className="mb-6">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Select Payment Method</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={() => setPaymentMethod('Cash')}
+              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
+            >
+              <Banknote size={18} /> Cash
+            </button>
+            <button 
+              onClick={() => setPaymentMethod('M-Pesa')}
+              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
+            >
+              <CreditCard size={18} /> M-Pesa
+            </button>
+          </div>
         </div>
 
         <div className="border-t pt-6 space-y-4">
@@ -189,7 +255,7 @@ export default function POS() {
           <button 
             onClick={completeSale}
             disabled={isProcessing || cart.length === 0}
-            className="w-full bg-slate-900 text-amber-500 py-6 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-slate-900 text-amber-500 py-6 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
             {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle size={24}/> COMPLETE SALE</>}
           </button>
