@@ -1,28 +1,22 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  Users, 
-  Receipt, 
-  Truck, 
-  LogOut 
+  LayoutDashboard, ShoppingCart, Package, Users, 
+  Receipt, Truck, LogOut 
 } from 'lucide-react';
 
-// Import Pages (from src/pages)
-import Dashboard from './pages/Dashboard';
+// --- CORRECTED PATHS ---
+// These look in src/components/
+import Dashboard from './components/Dashboard';
+import POS from './components/POS';
+import SupplierOrders from './components/SupplierOrders';
+
+// These look in src/pages/
 import Products from './pages/Products';
 import Distributors from './pages/Distributors';
 import Expenses from './pages/Expenses';
 
-// Import Components (from src/components)
-import POS from './components/POS';
-import SupplierOrders from './components/SupplierOrders';
-
-// Navigation Sidebar Component
 function Navigation() {
   const location = useLocation();
-
   const menuItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/pos', icon: ShoppingCart, label: 'Point of Sale' },
@@ -40,20 +34,16 @@ function Navigation() {
         </div>
         <span className="text-white font-black text-xl tracking-tight uppercase">Nit-Nit Cereals</span>
       </div>
-
       <nav className="flex-1 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
-          
           return (
             <Link
               key={item.path}
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                isActive 
-                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/20' 
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                isActive ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               <Icon size={20} />
@@ -62,18 +52,10 @@ function Navigation() {
           );
         })}
       </nav>
-
-      <div className="pt-4 border-t border-slate-800">
-        <button className="flex items-center gap-3 px-4 py-3 w-full text-slate-400 hover:text-red-400 transition-colors font-bold text-left">
-          <LogOut size={20} />
-          <span>Sign Out</span>
-        </button>
-      </div>
     </div>
   );
 }
 
-// Main App Component
 export default function App() {
   return (
     <Router>
