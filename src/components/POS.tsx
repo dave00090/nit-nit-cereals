@@ -71,7 +71,6 @@ export default function POS() {
 
   const total = cart.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
 
-  // --- UPDATED RECEIPT GENERATION ---
   const printReceipt = (saleItems: any[], saleTotal: number, method: string) => {
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (!printWindow) return;
@@ -128,8 +127,16 @@ export default function POS() {
     setIsProcessing(true);
 
     try {
+      // Create a simplified items array to avoid column bloat
+      const simplifiedItems = cart.map(i => ({
+        id: i.id,
+        name: i.name,
+        qty: i.quantity,
+        price: i.selling_price
+      }));
+
       const { error: saleError } = await supabase.from('sales').insert([{
-        items: cart,
+        items: simplifiedItems,
         total_amount: total,
         payment_method: paymentMethod
       }]);
@@ -149,9 +156,9 @@ export default function POS() {
 
       setCart([]);
       fetchProducts(); 
-      setPaymentMethod('Cash'); // Reset to default
+      setPaymentMethod('Cash');
     } catch (error: any) {
-      alert("Sale Failed: " + error.message);
+      alert("Sale Failed: " + error.message + ". Ensure you added the 'items' column to the 'sales' table in Supabase.");
     } finally {
       setIsProcessing(false);
     }
@@ -159,6 +166,7 @@ export default function POS() {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans">
+      {/* Left side: Products */}
       <div className="flex-1 p-8 overflow-y-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-black text-slate-900 uppercase italic">Checkout</h1>
@@ -194,6 +202,7 @@ export default function POS() {
         </div>
       </div>
 
+      {/* Right side: Cart */}
       <div className="w-[450px] bg-white border-l border-slate-200 p-8 flex flex-col shadow-2xl relative z-10">
         <div className="flex items-center gap-3 mb-8 border-b pb-6">
           <div className="bg-amber-500 p-3 rounded-2xl text-slate-900">
@@ -221,13 +230,12 @@ export default function POS() {
                     <span className="font-black text-slate-900 min-w-[20px] text-center">{item.quantity}</span>
                     <button onClick={() => updateQuantity(item.id, 1)} className="text-slate-400 hover:text-slate-900"><Plus size={14}/></button>
                 </div>
-                <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={18}/></button>
+                <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* PAYMENT METHOD SELECTOR */}
         <div className="mb-6">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Select Payment Method</p>
           <div className="grid grid-cols-2 gap-3">
