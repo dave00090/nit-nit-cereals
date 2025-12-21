@@ -20,7 +20,7 @@ export default function POS() {
     loadProducts();
   }, []);
 
-  // REAL-TIME LISTENER
+  // REAL-TIME LISTENER: Auto-captures the M-Pesa code when the user enters their PIN
   useEffect(() => {
     if (!checkoutId) return;
 
@@ -39,7 +39,7 @@ export default function POS() {
             setMpesaReceipt(payload.new.mpesa_receipt_number);
             setIsProcessingMpesa(false);
           } else {
-            alert("Payment Failed: " + payload.new.result_desc);
+            alert("M-Pesa Payment Failed: " + payload.new.result_desc);
             setIsProcessingMpesa(false);
             setCheckoutId(null);
           }
@@ -82,38 +82,48 @@ export default function POS() {
   const handleMpesaPush = async () => {
     const total = calculateTotal();
     
-    // Safety Checks
     if (total < 1) return alert("Total must be at least 1 KES");
     if (!phoneNumber) return alert("Please enter a phone number");
     
-    // Clean phone number to 2547XXXXXXXX format
+    // Format number to 2547XXXXXXXX
     let cleanPhone = phoneNumber.replace(/\s+/g, '').replace('+', '');
     if (cleanPhone.startsWith('0')) {
       cleanPhone = '254' + cleanPhone.substring(1);
     }
     
+    if (cleanPhone.length !== 12) return alert("Phone number must be 12 digits (e.g., 254712345678)");
+
     setIsProcessingMpesa(true);
     setMpesaReceipt(null);
+    console.log("Attempting push to:", cleanPhone, "Amount:", Math.round(total));
 
     try {
       const { data, error } = await supabase.functions.invoke('mpesa-stk-push', {
         body: { 
           phone: cleanPhone, 
-          amount: Math.round(total) // Ensure it's a whole number for Safaricom
+          amount: Math.round(total) 
         }
       });
 
-      if (error) throw error;
+      // Handle Supabase/Network Errors
+      if (error) {
+        console.error("Function Invoke Error:", error);
+        throw new Error(error.message || "Could not reach the payment server");
+      }
       
+      console.log("Safaricom Response:", data);
+
+      // Handle Safaricom API Response
       if (data.ResponseCode === "0") {
         setCheckoutId(data.CheckoutRequestID);
+        // Note: The listener above will handle the success popup
       } else {
-        throw new Error(data.CustomerMessage || "Push failed");
+        throw new Error(data.CustomerMessage || data.errorMessage || "Push Rejected by Safaricom");
       }
 
     } catch (err: any) {
       console.error("M-Pesa Error:", err);
-      alert(`Error: ${err.message || "Could not trigger M-Pesa push"}`);
+      alert(`M-Pesa Error: ${err.message}`);
       setIsProcessingMpesa(false);
     }
   };
@@ -129,9 +139,9 @@ export default function POS() {
       mpesa_receipt_number: mpesaReceipt
     }]).select().single();
 
-    if (error) return alert("Sale completion failed");
+    if (error) return alert("Sale completion failed in database");
 
-    alert(`Sale Completed! Receipt: ${mpesaReceipt || 'N/A'}`);
+    alert(`Sale Completed Successfully! Receipt: ${mpesaReceipt || 'N/A'}`);
     setCart([]);
     setMpesaReceipt(null);
     setCheckoutId(null);
@@ -140,7 +150,7 @@ export default function POS() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6 p-4">
-      {/* Product Selection */}
+      {/* Product List */}
       <div className="flex-1 flex flex-col gap-4">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
           <Search className="text-slate-400 w-5 h-5" />
@@ -195,24 +205,26 @@ export default function POS() {
         </div>
 
         <div className="p-4 bg-slate-50 border-t space-y-4">
+          {/* Payment Method Toggle */}
           <div className="flex gap-2 p-1 bg-white rounded-lg border">
             <button onClick={() => setPaymentMethod('Cash')} className={`flex-1 py-2 rounded-md font-bold text-sm transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500'}`}>Cash</button>
             <button onClick={() => setPaymentMethod('M-Pesa')} className={`flex-1 py-2 rounded-md font-bold text-sm transition-all ${paymentMethod === 'M-Pesa' ? 'bg-green-600 text-white shadow-md' : 'text-slate-500'}`}>M-Pesa</button>
           </div>
 
+          {/* M-Pesa Interactive Area */}
           {paymentMethod === 'M-Pesa' && (
             <div className="p-4 bg-white border border-green-200 rounded-xl space-y-3 shadow-inner">
               {mpesaReceipt ? (
-                <div className="flex items-center gap-3 text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="flex items-center gap-3 text-green-700 bg-green-50 p-3 rounded-lg border border-green-200 animate-in zoom-in">
                   <CheckCircle2 className="w-8 h-8" />
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider">M-Pesa Confirmed</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-green-600">Payment Received</p>
                     <p className="font-black text-xl leading-none">{mpesaReceipt}</p>
                   </div>
                 </div>
               ) : (
                 <>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Phone</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Phone (254...)</label>
                   <div className="flex gap-2">
                     <input 
                       type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} 
@@ -222,26 +234,26 @@ export default function POS() {
                     <button 
                       onClick={handleMpesaPush} 
                       disabled={isProcessingMpesa || cart.length === 0} 
-                      className="bg-green-600 text-white p-2 rounded-lg disabled:bg-slate-300"
+                      className="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg disabled:bg-slate-300 transition-colors"
                     >
                       {isProcessingMpesa ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
                     </button>
                   </div>
-                  {isProcessingMpesa && <p className="text-[10px] text-green-600 font-bold animate-pulse">Check phone for PIN prompt...</p>}
+                  {isProcessingMpesa && <p className="text-[10px] text-green-600 font-bold animate-pulse">Waiting for customer PIN...</p>}
                 </>
               )}
             </div>
           )}
 
-          <div className="flex justify-between items-end">
-            <span className="text-slate-500 font-medium">Total</span>
+          <div className="flex justify-between items-end pt-2">
+            <span className="text-slate-500 font-medium">Total Amount</span>
             <span className="text-2xl font-black text-slate-900">KES {calculateTotal().toLocaleString()}</span>
           </div>
 
           <button 
             onClick={handleCompleteSale} 
             disabled={cart.length === 0 || (paymentMethod === 'M-Pesa' && !mpesaReceipt)} 
-            className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-lg shadow-lg disabled:opacity-30"
+            className="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-lg shadow-lg disabled:opacity-30 transition-all active:scale-95"
           >
             COMPLETE SALE
           </button>
