@@ -37,21 +37,19 @@ export default function Distributors() {
     setLoading(false);
   }
 
-  // --- LOG EXPENSE: REMOVED USER_ID TO MATCH YOUR SCHEMA ---
   const logExpense = async (distName: string, amountValue: number, note: string) => {
     try {
       const { error } = await supabase.from('expenses').insert([{
         amount: Number(amountValue),
         payment_method: 'Supplier Pay', 
         expense_date: new Date().toISOString().split('T')[0],
-        notes: `Payment to ${distName} (${note})`
+        notes: `Payment to ${distName} (${note})`,
+        description: `Supplier payment for ${distName}: ${note}`
       }]);
 
       if (error) {
         console.error("Expense Log Error:", error.message);
         alert(`Debt updated, but expense record failed: ${error.message}`);
-      } else {
-        console.log("Expense recorded successfully!");
       }
     } catch (err) {
       console.error("System Error:", err);
@@ -138,7 +136,7 @@ export default function Distributors() {
       <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Suppliers</h1>
-          <p className="text-slate-500 font-medium tracking-tight">Financial records for Nit-Nit Cereals</p>
+          <p className="text-slate-500 font-medium tracking-tight">Nit-Nit Cereals Supplier Management</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -209,7 +207,7 @@ export default function Distributors() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-10">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-black text-slate-800">{editingId ? 'Edit Supplier' : 'Add Supplier'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-3 bg-slate-50 rounded-full text-slate-400 hover:text-slate-900 transition-all"><X size={24}/></button>
