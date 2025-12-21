@@ -37,18 +37,17 @@ export default function Distributors() {
     setLoading(false);
   }
 
-  // --- UPDATED LOG EXPENSE WITH created_at ---
+  // --- LOG EXPENSE: MATCHED TO YOUR EXACT SCHEMA ---
   const logExpense = async (distName: string, amountValue: number, note: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Your Schema: amount, payment_method, expense_date, notes
       const { error } = await supabase.from('expenses').insert([{
-        title: `Supplier Payment: ${distName}`,
         amount: Number(amountValue),
-        category: 'Supplier Payment',
-        description: note,
-        // Using created_at instead of date to match Supabase schema
-        created_at: new Date().toISOString(), 
+        payment_method: 'Supplier Pay', 
+        expense_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+        notes: `Payment to ${distName} (${note})`,
         user_id: user?.id 
       }]);
 
@@ -61,7 +60,6 @@ export default function Distributors() {
     }
   };
 
-  // --- PAYMENT LOGIC ---
   const handleFullPayment = async (dist: Distributor) => {
     if (dist.total_debt <= 0) return alert("No debt to clear.");
     if (!confirm(`Clear KES ${dist.total_debt.toLocaleString()} for ${dist.name}?`)) return;
@@ -115,7 +113,6 @@ export default function Distributors() {
     }
   };
 
-  // --- CRUD LOGIC ---
   const handleAddNew = () => {
     setEditingId(null);
     setFormData({ name: '', phone: '', total_debt: 0 });
@@ -143,15 +140,15 @@ export default function Distributors() {
       <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Suppliers</h1>
-          <p className="text-slate-500 font-medium tracking-tight">Financial records for Nit-Nit Cereals</p>
+          <p className="text-slate-500 font-medium">Tracking payments and debt for Nit-Nit Cereals</p>
         </div>
         
         <div className="flex items-center gap-3">
           <div className="relative bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-2 flex items-center gap-2 w-80">
             <Search className="text-slate-400" size={20} />
             <input 
-              type="text" placeholder="Search partners..."
-              className="outline-none flex-1 text-slate-600 bg-transparent py-1"
+              type="text" placeholder="Search suppliers..."
+              className="outline-none flex-1 text-slate-600 bg-transparent py-1 font-bold"
               value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
@@ -186,7 +183,7 @@ export default function Distributors() {
               <div className="bg-slate-900 p-6 rounded-2xl text-white mb-8 shadow-xl shadow-slate-200">
                 <div className="flex justify-between items-start mb-3">
                   <Wallet size={20} className="text-slate-400" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Balance Owed</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Debt</span>
                 </div>
                 <div className="flex items-end justify-between">
                   <p className="text-2xl font-black">KES {dist.total_debt.toLocaleString()}</p>
@@ -214,21 +211,21 @@ export default function Distributors() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-10">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-black text-slate-800">{editingId ? 'Edit Partner' : 'Add Partner'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-3 bg-slate-50 rounded-full text-slate-400"><X size={24}/></button>
+              <h2 className="text-2xl font-black text-slate-800 tracking-tight">{editingId ? 'Edit Supplier' : 'Add Supplier'}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-3 bg-slate-50 rounded-full text-slate-400 hover:text-slate-900 transition-all"><X size={24}/></button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              <input required placeholder="Distributor Name" className="w-full bg-slate-50 px-6 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-amber-500 font-bold"
+              <input required placeholder="Supplier Name" className="w-full bg-slate-50 px-6 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-amber-500 font-bold"
                 value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
               <input required placeholder="Phone Number" className="w-full bg-slate-50 px-6 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-amber-500 font-bold"
                 value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-              <input type="number" placeholder="Total Debt" className="w-full bg-slate-50 px-6 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-amber-500 font-bold"
+              <input type="number" placeholder="Debt Balance" className="w-full bg-slate-50 px-6 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-amber-500 font-bold"
                 value={formData.total_debt} onChange={(e) => setFormData({...formData, total_debt: Number(e.target.value)})} />
               <button type="submit" className="w-full py-5 bg-amber-500 text-white font-black rounded-2xl shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center gap-3 mt-4">
-                {loading ? <Loader2 className="animate-spin" /> : <><Check size={20}/> Confirm Changes</>}
+                {loading ? <Loader2 className="animate-spin" /> : <><Check size={20}/> Save Changes</>}
               </button>
             </form>
           </div>
