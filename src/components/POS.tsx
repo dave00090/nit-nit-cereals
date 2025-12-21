@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Search, ShoppingCart, Trash2, Plus, Minus, 
-  CheckCircle, Loader2, Barcode, Wallet, Printer, CreditCard, Banknote
+  CheckCircle, Loader2, Barcode, Wallet, Printer, CreditCard, Banknote, Save
 } from 'lucide-react';
 
 export default function POS() {
@@ -71,73 +71,61 @@ export default function POS() {
 
   const total = cart.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
 
-  const printReceipt = (saleItems: any[], saleTotal: number, method: string) => {
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) {
-      alert("Please allow pop-ups to print receipts");
-      return;
-    }
+  // --- AUTOMATIC RECEIPT SAVING LOGIC ---
+  const autoSaveReceipt = (saleItems: any[], saleTotal: number, method: string) => {
+    const date = new Date();
+    const timestamp = date.getTime();
+    const fileName = `NitNit_Receipt_${timestamp}.html`;
 
     const itemsHtml = saleItems.map(item => `
       <tr>
-        <td style="padding: 5px 0; font-size: 14px;">${item.name} x${item.quantity}</td>
-        <td style="text-align: right; font-size: 14px;">KES ${(item.selling_price * item.quantity).toLocaleString()}</td>
+        <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">${item.name} x${item.quantity}</td>
+        <td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">KES ${(item.selling_price * item.quantity).toLocaleString()}</td>
       </tr>
     `).join('');
 
-    const htmlContent = `
+    const receiptContent = `
       <html>
         <head>
-          <title>Receipt - Nit-Nit Cereals</title>
           <style>
-            body { font-family: 'Courier New', Courier, monospace; padding: 20px; color: #333; line-height: 1.4; }
-            .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-            table { width: 100%; margin: 10px 0; border-collapse: collapse; }
-            .total-section { border-top: 2px dashed #000; padding-top: 10px; margin-top: 10px; }
-            .grand-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; }
-            .method { font-size: 12px; margin-top: 4px; color: #666; }
-            .footer { text-align: center; margin-top: 40px; font-size: 12px; }
-            @media print { .no-print { display: none; } }
+            body { font-family: 'Courier New', Courier, monospace; width: 350px; padding: 20px; color: #333; line-height: 1.4; }
+            .header { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 15px; margin-bottom: 15px; }
+            table { width: 100%; border-collapse: collapse; }
+            .total-area { border-top: 2px dashed #333; margin-top: 15px; padding-top: 15px; }
+            .row { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; }
+            .method { font-size: 12px; color: #666; margin-top: 5px; }
+            .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h2 style="margin: 0;">NIT-NIT CEREALS</h2>
-            <p style="margin: 5px 0;">Quality You Can Trust</p>
-            <p style="margin: 0; font-size: 12px;">${new Date().toLocaleString()}</p>
+            <h1 style="margin: 0; font-size: 22px;">NIT-NIT CEREALS</h1>
+            <p style="margin: 5px 0;">Premium Supermarket Inventory</p>
+            <p style="margin: 0; font-size: 11px;">${date.toLocaleString()}</p>
           </div>
-          <table>
-            <thead>
-              <tr style="border-bottom: 1px solid #eee;">
-                <th style="text-align: left; font-size: 12px; padding-bottom: 5px;">Item</th>
-                <th style="text-align: right; font-size: 12px; padding-bottom: 5px;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>${itemsHtml}</tbody>
-          </table>
-          <div class="total-section">
-            <div class="grand-total">
+          <table>${itemsHtml}</table>
+          <div class="total-area">
+            <div class="row">
               <span>TOTAL</span>
               <span>KES ${saleTotal.toLocaleString()}</span>
             </div>
             <div class="method">Paid via: ${method}</div>
           </div>
           <div class="footer">
-            <p>Thank you for shopping with us!</p>
-            <p>Goods once sold are not returnable.</p>
+            <p>Thank you for your business!</p>
+            <p>Receipt Saved Automatically</p>
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              window.onafterprint = function() { window.close(); };
-            };
-          </script>
         </body>
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    const blob = new Blob([receiptContent], { type: 'text/html' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const completeSale = async () => {
@@ -145,7 +133,7 @@ export default function POS() {
     setIsProcessing(true);
 
     try {
-      // 1. Save Sale to Database
+      // 1. Record Sale in Supabase
       const { error: saleError } = await supabase.from('sales').insert([{
         items: cart,
         total_amount: total,
@@ -154,7 +142,7 @@ export default function POS() {
 
       if (saleError) throw saleError;
 
-      // 2. Deduct Stock from Products
+      // 2. Update Stock Levels
       const stockUpdates = cart.map(item => {
         return supabase
           .from('products')
@@ -164,10 +152,13 @@ export default function POS() {
 
       await Promise.all(stockUpdates);
       
-      // 3. Print & Reset
-      printReceipt(cart, total, paymentMethod);
+      // 3. Trigger Automatic Download
+      autoSaveReceipt(cart, total, paymentMethod);
+
+      // 4. Success State
       setCart([]);
       fetchProducts(); 
+      setPaymentMethod('Cash');
     } catch (error: any) {
       alert("Sale Failed: " + error.message);
     } finally {
@@ -214,17 +205,17 @@ export default function POS() {
 
       <div className="w-[450px] bg-white border-l border-slate-200 p-8 flex flex-col shadow-2xl relative z-10">
         <div className="flex items-center gap-3 mb-8 border-b pb-6">
-          <div className="bg-amber-500 p-3 rounded-2xl text-slate-900 shadow-lg shadow-amber-500/20">
+          <div className="bg-amber-500 p-3 rounded-2xl text-slate-900 shadow-lg">
             <ShoppingCart size={24} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Cart</h2>
+          <h2 className="text-2xl font-black text-slate-900 uppercase">Cart</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2">
           {cart.length === 0 && (
             <div className="text-center py-20 opacity-20">
               <ShoppingCart size={64} className="mx-auto mb-4 text-slate-300" />
-              <p className="font-black uppercase tracking-widest text-xs">Waiting for items...</p>
+              <p className="font-black uppercase tracking-widest text-xs">Ready for Sale</p>
             </div>
           )}
           {cart.map(item => (
@@ -250,13 +241,13 @@ export default function POS() {
           <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={() => setPaymentMethod('Cash')} 
-              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}
+              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}
             >
               <Banknote size={18} /> Cash
             </button>
             <button 
               onClick={() => setPaymentMethod('M-Pesa')} 
-              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}
+              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-100'}`}
             >
               <CreditCard size={18} /> M-Pesa
             </button>
@@ -265,7 +256,7 @@ export default function POS() {
 
         <div className="border-t pt-6 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-slate-400 font-black uppercase tracking-widest text-xs">Total</span>
+            <span className="text-slate-400 font-black uppercase tracking-widest text-xs">Grand Total</span>
             <span className="text-4xl font-black text-slate-900 italic">KES {total.toLocaleString()}</span>
           </div>
           <button 
