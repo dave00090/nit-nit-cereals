@@ -18,7 +18,7 @@ interface Distributor {
   phone: string;
   address: string;
   recent_orders?: Order[];
-  total_spend?: number; // New Stat
+  total_spend?: number;
 }
 
 export default function Distributors() {
@@ -28,8 +28,12 @@ export default function Distributors() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Form State
   const [formData, setFormData] = useState({
-    name: '', contact_person: '', phone: '', address: ''
+    name: '',
+    contact_person: '',
+    phone: '',
+    address: ''
   });
 
   useEffect(() => {
@@ -38,8 +42,7 @@ export default function Distributors() {
 
   async function fetchDistributors() {
     setLoading(true);
-    // Fetches distributors and ALL their supplier orders to calculate total spend
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('distributors')
       .select(`
         *,
@@ -50,52 +53,67 @@ export default function Distributors() {
     if (data) {
       const formattedData = data.map((d: any) => ({
         ...d,
-        recent_orders: d.supplier_orders.slice(0, 3), // Last 3 for history
-        total_spend: d.supplier_orders.reduce((sum: number, order: any) => sum + (order.total_amount || 0), 0)
+        recent_orders: d.supplier_orders?.slice(0, 3) || [],
+        total_spend: d.supplier_orders?.reduce((sum: number, order: any) => sum + (order.total_amount || 0), 0) || 0
       }));
       setDistributors(formattedData);
     }
     setLoading(false);
   }
 
-  const filteredDistributors = distributors.filter(d => 
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- MODAL CONTROLS ---
+  const handleAddNew = () => {
+    setEditingId(null);
+    setFormData({ name: '', contact_person: '', phone: '', address: '' });
+    setIsModalOpen(true);
+  };
 
-  const openModal = (distributor?: Distributor) => {
-    if (distributor) {
-      setEditingId(distributor.id);
-      setFormData({
-        name: distributor.name, contact_person: distributor.contact_person,
-        phone: distributor.phone, address: distributor.address
-      });
-    } else {
-      setEditingId(null);
-      setFormData({ name: '', contact_person: '', phone: '', address: '' });
-    }
+  const handleEdit = (dist: Distributor) => {
+    setEditingId(dist.id);
+    setFormData({
+      name: dist.name,
+      contact_person: dist.contact_person,
+      phone: dist.phone,
+      address: dist.address
+    });
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    if (editingId) {
-      await supabase.from('distributors').update(formData).eq('id', editingId);
-    } else {
-      await supabase.from('distributors').insert([formData]);
+
+    try {
+      if (editingId) {
+        // Update Existing
+        await supabase.from('distributors').update(formData).eq('id', editingId);
+      } else {
+        // Insert New
+        await supabase.from('distributors').insert([formData]);
+      }
+      setIsModalOpen(false);
+      await fetchDistributors();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save distributor details.");
+    } finally {
+      setLoading(false);
     }
-    setIsModalOpen(false);
-    await fetchDistributors();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this distributor?")) return;
+    await supabase.from('distributors').delete().eq('id', id);
+    fetchDistributors();
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* HEADER SECTION */}
+      {/* HEADER & SEARCH */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Suppliers</h1>
-          <p className="text-slate-500">Analytics and management for {distributors.length} partners</p>
+          <p className="text-slate-500">Manage partners and view order history</p>
         </div>
         
         <div className="flex w-full md:w-auto gap-3">
@@ -110,31 +128,30 @@ export default function Distributors() {
             />
           </div>
           <button 
-            onClick={() => openModal()}
-            className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 active:scale-95"
+            onClick={handleAddNew}
+            className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-600 transition-all shadow-lg active:scale-95"
           >
             <UserPlus size={18} /> Add New
           </button>
         </div>
       </div>
 
-      {/* DISTRIBUTORS GRID */}
-      {loading && distributors.length === 0 ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-amber-500" size={40} /></div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDistributors.map((dist) => (
-            <div key={dist.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:border-amber-200 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300">
+      {/* GRID VIEW */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {distributors
+          .filter(d => d.name.toLowerCase().includes(searchTerm.toLowerCase()))
+          .map((dist) => (
+            <div key={dist.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl transition-all duration-300">
               <div className="p-8 space-y-6">
                 <div className="flex justify-between items-start">
-                  <div className="bg-slate-900 p-3.5 rounded-2xl text-white shadow-lg shadow-slate-200">
+                  <div className="bg-slate-900 p-3.5 rounded-2xl text-white">
                     <Package size={24} />
                   </div>
                   <div className="flex gap-1 bg-slate-50 p-1 rounded-xl">
-                    <button onClick={() => openModal(dist)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-white rounded-lg transition-all">
+                    <button onClick={() => handleEdit(dist)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-white rounded-lg transition-all">
                       <Pencil size={16} />
                     </button>
-                    <button className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all">
+                    <button onClick={() => handleDelete(dist.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all">
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -142,58 +159,99 @@ export default function Distributors() {
 
                 <div>
                   <h3 className="text-2xl font-black text-slate-800 leading-tight mb-2">{dist.name}</h3>
-                  <div className="flex flex-wrap gap-4 mt-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600"><User size={14} /></div>
-                      <span className="font-bold">{dist.contact_person}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><Phone size={14} /></div>
-                      <span className="font-medium">{dist.phone}</span>
-                    </div>
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-2 text-sm text-slate-500 font-bold">
+                      <User size={14} className="text-amber-500" /> {dist.contact_person}
+                    </span>
+                    <span className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                      <Phone size={14} className="text-slate-300" /> {dist.phone}
+                    </span>
                   </div>
                 </div>
 
-                {/* TOTAL SPEND BADGE */}
                 <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-green-600 text-white p-2 rounded-xl"><TrendingUp size={16} /></div>
+                   <div className="flex items-center gap-3">
+                    <TrendingUp size={16} className="text-green-600" />
                     <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Total Spend</span>
                   </div>
                   <span className="text-xl font-black text-green-700">KES {dist.total_spend?.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* RECENT ORDERS AREA */}
-              <div className="bg-slate-50/50 p-8 flex-1 border-t border-slate-100">
+              {/* FOOTER ORDERS */}
+              <div className="bg-slate-50/50 p-8 pt-6 border-t border-slate-100 flex-1">
                 <div className="flex items-center justify-between mb-4">
-                   <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                    <History size={12} /> Last Deliveries
-                  </div>
-                  <button 
-                    onClick={() => alert(`Starting re-order from ${dist.name}`)}
-                    className="text-[10px] font-bold bg-white text-amber-600 border border-amber-200 px-4 py-1.5 rounded-full flex items-center gap-2 hover:bg-amber-600 hover:text-white transition-all shadow-sm"
-                  >
-                    <RefreshCw size={10} /> Re-order
+                  <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                    <History size={12}/> Recent Orders
+                  </span>
+                  <button className="text-[10px] font-bold text-amber-600 border border-amber-200 px-3 py-1 rounded-full bg-white hover:bg-amber-600 hover:text-white transition-all">
+                    <RefreshCw size={10} className="inline mr-1"/> Re-order
                   </button>
                 </div>
-                
                 <div className="space-y-2">
-                  {dist.recent_orders?.length ? dist.recent_orders.map(order => (
-                    <div key={order.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200/50 text-xs shadow-sm shadow-slate-100/50">
-                      <span className="font-bold text-slate-500">{new Date(order.created_at).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}</span>
+                  {dist.recent_orders?.map(order => (
+                    <div key={order.id} className="flex justify-between bg-white p-3 rounded-xl border border-slate-200/50 text-xs">
+                      <span className="font-bold text-slate-500">{new Date(order.created_at).toLocaleDateString()}</span>
                       <span className="font-black text-slate-900">KES {order.total_amount.toLocaleString()}</span>
                     </div>
-                  )) : <p className="text-xs text-slate-300 italic text-center py-2">No previous orders found</p>}
+                  ))}
                 </div>
               </div>
             </div>
-          ))}
+        ))}
+      </div>
+
+      {/* --- ADD/EDIT MODAL --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="p-8 pb-0 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-slate-800">{editingId ? 'Edit Partner' : 'Add Partner'}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-8 space-y-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Company Name</label>
+                <input 
+                  required type="text" 
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-amber-500 transition-all font-bold"
+                  value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Contact Person</label>
+                <input 
+                  required type="text" 
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-amber-500 transition-all font-bold"
+                  value={formData.contact_person} onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Phone</label>
+                  <input required type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-amber-500 transition-all font-bold"
+                    value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">City/Location</label>
+                  <input required type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-amber-500 transition-all font-bold"
+                    value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full py-4 bg-amber-500 text-white font-black rounded-2xl shadow-xl shadow-amber-200 hover:bg-amber-600 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4"
+              >
+                {loading ? <Loader2 className="animate-spin" size={20}/> : <><Check size={20}/> Save Details</>}
+              </button>
+            </form>
+          </div>
         </div>
       )}
-
-      {/* MODAL IS THE SAME AS PREVIOUS VERSION */}
-      {/* ... [Keeping same modal code] ... */}
     </div>
   );
 }
