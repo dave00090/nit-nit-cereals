@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Plus, Search, Edit3, Trash2, Package, AlertTriangle, 
-  Check, X, Loader2, Barcode, RefreshCw, Box
+  Check, X, Loader2, Barcode, RefreshCw, Box, Truck
 } from 'lucide-react';
 
-// SPECIFIC DROPDOWNS PER YOUR REQUEST
 const PRODUCT_TYPES = ["Rice", "Cereals", "Drinks", "Flour", "Cosmetics", "Bakery", "Dairy", "Household", "Snacks", "Vegetables"];
 const UNIT_OPTIONS = ["Pieces", "kg", "Carton", "Packets", "Litres", "Grams", "Bundle", "Bales"];
 
 export default function Inventory() {
   const [products, setProducts] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]); // New State for Suppliers
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,17 +20,21 @@ export default function Inventory() {
     name: '',
     description: '',
     barcode: '',
-    category: 'Rice', // The "Type of Product" dropdown
-    unit: 'Pieces',    // Matches your DB column 'unit'
+    category: 'Rice',
+    unit: 'Pieces',
     cost_price: 0,
     selling_price: 0,
     current_stock: 0,
-    reorder_level: 5
+    reorder_level: 5,
+    supplier_id: '' // Linked to suppliers table
   };
 
   const [formData, setFormData] = useState<any>(initialForm);
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { 
+    fetchProducts();
+    fetchSuppliers(); // Load suppliers on mount
+  }, []);
 
   async function fetchProducts() {
     setLoading(true);
@@ -42,21 +46,22 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- BARCODE-LIST.COM LOGIC ---
+  async function fetchSuppliers() {
+    const { data } = await supabase.from('suppliers').select('id, name').order('name');
+    if (data) setSuppliers(data);
+  }
+
   const handleBarcodeLookup = async () => {
     if (!formData.barcode) return;
     setLoading(true);
     try {
-      // Fetching from OpenFoodFacts (Universal Barcode Database)
       const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${formData.barcode}.json`);
       const data = await res.json();
-      
       if (data.status === 1) {
         setFormData({
           ...formData,
           name: data.product.product_name || '',
           description: data.product.generic_name || data.product.categories || '',
-          // Auto-detect category if possible
           category: data.product.main_category?.split(':')[1] || 'Cereals'
         });
       } else {
@@ -85,6 +90,17 @@ export default function Inventory() {
       result = await supabase.from('products').update(submissionData).eq('id', editingProduct.id);
     } else {
       result = await supabase.from('products').insert([submissionData]);
+      
+      // LOG TO SUPPLIER HISTORY if a supplier is selected and it's a new product
+      if (!result.error && formData.supplier_id && formData.current_stock > 0) {
+        await supabase.from('supplier_purchases').insert([{
+          supplier_id: formData.supplier_id,
+          product_name: formData.name,
+          quantity: Number(formData.current_stock),
+          unit_cost: Number(formData.cost_price),
+          total_cost: Number(formData.cost_price) * Number(formData.current_stock)
+        }]);
+      }
     }
 
     if (result.error) {
@@ -101,7 +117,6 @@ export default function Inventory() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-10">
           <div>
             <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Supermarket Stock</h1>
@@ -118,19 +133,16 @@ export default function Inventory() {
           </div>
         </div>
 
-        {/* SEARCH BAR */}
         <div className="mb-8 relative max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input type="text" placeholder="Search name or scan barcode..." className="w-full bg-white border border-slate-200 pl-12 pr-4 py-4 rounded-2xl font-bold focus:border-amber-500 outline-none shadow-sm"
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
 
-        {/* PRODUCT LIST */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.barcode || '').includes(searchTerm)).map(product => (
             <div key={product.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm hover:border-amber-500 transition-all group relative overflow-hidden">
               <div className="flex justify-between items-start mb-4">
-                {/* STATUS INDICATOR (FIXED) */}
                 <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase ${
                   Number(product.current_stock) <= Number(product.reorder_level) ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
                 }`}>
@@ -164,7 +176,6 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in duration-200">
@@ -191,8 +202,20 @@ export default function Inventory() {
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
+              {/* INTEGRATED SUPPLIER SELECTOR */}
+              <div className="col-span-2 space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                  <Truck size={12} /> Source Supplier
+                </label>
+                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
+                  value={formData.supplier_id} onChange={e => setFormData({...formData, supplier_id: e.target.value})}>
+                  <option value="">Select a Supplier...</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Type (Rice, Drinks, etc)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Type</label>
                 <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
                   value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
                   {PRODUCT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -200,7 +223,7 @@ export default function Inventory() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit (kg, pieces, etc)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit</label>
                 <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
                   value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}>
                   {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
