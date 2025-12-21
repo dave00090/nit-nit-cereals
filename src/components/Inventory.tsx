@@ -10,7 +10,7 @@ const UNIT_OPTIONS = ["Pieces", "kg", "Carton", "Packets", "Litres", "Grams", "B
 
 export default function Inventory() {
   const [products, setProducts] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]); // New State for Suppliers
+  const [suppliers, setSuppliers] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,14 +26,14 @@ export default function Inventory() {
     selling_price: 0,
     current_stock: 0,
     reorder_level: 5,
-    supplier_id: '' // Linked to suppliers table
+    supplier_id: '' 
   };
 
   const [formData, setFormData] = useState<any>(initialForm);
 
   useEffect(() => { 
     fetchProducts();
-    fetchSuppliers(); // Load suppliers on mount
+    fetchSuppliers(); 
   }, []);
 
   async function fetchProducts() {
@@ -46,9 +46,13 @@ export default function Inventory() {
     setLoading(false);
   }
 
+  // --- NEW: FETCH SUPPLIERS FOR DROPDOWN ---
   async function fetchSuppliers() {
-    const { data } = await supabase.from('suppliers').select('id, name').order('name');
-    if (data) setSuppliers(data);
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('id, name')
+      .order('name', { ascending: true });
+    if (!error && data) setSuppliers(data);
   }
 
   const handleBarcodeLookup = async () => {
@@ -91,7 +95,7 @@ export default function Inventory() {
     } else {
       result = await supabase.from('products').insert([submissionData]);
       
-      // LOG TO SUPPLIER HISTORY if a supplier is selected and it's a new product
+      // AUTO-LOG TO SUPPLIER HISTORY
       if (!result.error && formData.supplier_id && formData.current_stock > 0) {
         await supabase.from('supplier_purchases').insert([{
           supplier_id: formData.supplier_id,
@@ -110,6 +114,7 @@ export default function Inventory() {
       setEditingProduct(null);
       setFormData(initialForm);
       fetchProducts();
+      fetchSuppliers(); // Refresh list to catch any new ones
     }
     setLoading(false);
   };
@@ -123,7 +128,7 @@ export default function Inventory() {
             <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Database: {products.length} Products</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={fetchProducts} className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-400 hover:text-amber-500 transition-all shadow-sm">
+            <button onClick={() => { fetchProducts(); fetchSuppliers(); }} className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-400 hover:text-amber-500 transition-all shadow-sm">
               <RefreshCw size={24} className={loading ? 'animate-spin' : ''} />
             </button>
             <button onClick={() => { setEditingProduct(null); setFormData(initialForm); setIsModalOpen(true); }}
@@ -202,15 +207,17 @@ export default function Inventory() {
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
-              {/* INTEGRATED SUPPLIER SELECTOR */}
+              {/* UPDATED SUPPLIER SELECTOR */}
               <div className="col-span-2 space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
                   <Truck size={12} /> Source Supplier
                 </label>
-                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
+                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 appearance-none"
                   value={formData.supplier_id} onChange={e => setFormData({...formData, supplier_id: e.target.value})}>
                   <option value="">Select a Supplier...</option>
-                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
                 </select>
               </div>
 
