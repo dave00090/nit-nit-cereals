@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   BarChart3, TrendingUp, Calendar, Wallet, 
-  Package, ArrowUpRight, ArrowDownRight, Loader2, Search, TrendingDown, Scale
+  Package, ArrowUpRight, ArrowDownRight, Loader2, Search, TrendingDown, Scale, Filter
 } from 'lucide-react';
 
 export default function Reports() {
   const [sales, setSales] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<any[]>([]); // New State
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [stats, setStats] = useState({
     totalRevenue: 0,
     grossProfit: 0,
-    totalExpenses: 0, // New Stat
-    netProfit: 0,      // New Stat
+    totalExpenses: 0,
+    netProfit: 0,
     cashSales: 0,
     mpesaSales: 0,
     totalTransactions: 0
@@ -21,16 +22,33 @@ export default function Reports() {
 
   useEffect(() => {
     fetchSalesData();
-  }, []);
+  }, [dateRange]); // Refetch when date range changes
 
   async function fetchSalesData() {
     setLoading(true);
     
-    // Fetch both Sales and Expenses in parallel
-    const [salesRes, expensesRes] = await Promise.all([
-      supabase.from('sales').select('*').order('created_at', { ascending: false }),
-      supabase.from('expenses').select('*')
-    ]);
+    let salesQuery = supabase.from('sales').select('*').order('created_at', { ascending: false });
+    let expensesQuery = supabase.from('expenses').select('*');
+
+    // Apply Date Filtering
+    const now = new Date();
+    let startDate = new Date();
+
+    if (dateRange === 'today') {
+      startDate.setHours(0, 0, 0, 0);
+      salesQuery = salesQuery.gte('created_at', startDate.toISOString());
+      expensesQuery = expensesQuery.gte('expense_date', startDate.toISOString().split('T')[0]);
+    } else if (dateRange === 'week') {
+      startDate.setDate(now.getDate() - 7);
+      salesQuery = salesQuery.gte('created_at', startDate.toISOString());
+      expensesQuery = expensesQuery.gte('expense_date', startDate.toISOString().split('T')[0]);
+    } else if (dateRange === 'month') {
+      startDate.setMonth(now.getMonth() - 1);
+      salesQuery = salesQuery.gte('created_at', startDate.toISOString());
+      expensesQuery = expensesQuery.gte('expense_date', startDate.toISOString().split('T')[0]);
+    }
+
+    const [salesRes, expensesRes] = await Promise.all([salesQuery, expensesQuery]);
 
     if (salesRes.data && expensesRes.data) {
       setSales(salesRes.data);
@@ -46,7 +64,6 @@ export default function Reports() {
     let cash = 0;
     let mpesa = 0;
 
-    // Calculate Sales Stats
     salesData.forEach(sale => {
       revenue += Number(sale.total_amount);
       if (sale.payment_method === 'Cash') cash += Number(sale.total_amount);
@@ -60,7 +77,6 @@ export default function Reports() {
       }
     });
 
-    // Calculate Expenses
     const totalExpenses = expensesData.reduce((sum, exp) => sum + Number(exp.amount), 0);
     const netProfit = grossProfit - totalExpenses;
 
@@ -84,12 +100,31 @@ export default function Reports() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-10">
-          <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Performance Reports</h1>
-          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Financial Overview & Analytics</p>
+        <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Performance Reports</h1>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Financial Overview & Analytics</p>
+          </div>
+
+          {/* DATE FILTER BUTTONS */}
+          <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+            {(['all', 'today', 'week', 'month'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => setDateRange(range)}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  dateRange === range 
+                  ? 'bg-slate-900 text-amber-500 shadow-lg' 
+                  : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
         </header>
 
-        {/* KEY STATS GRID - Updated with Net Profit */}
+        {/* KEY STATS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <ReportCard title="Total Revenue" value={`KES ${stats.totalRevenue.toLocaleString()}`} icon={<TrendingUp />} color="slate" />
           <ReportCard title="Total Expenses" value={`KES ${stats.totalExpenses.toLocaleString()}`} icon={<TrendingDown className="text-red-500" />} color="white" />
@@ -98,13 +133,13 @@ export default function Reports() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* RECENT TRANSACTIONS */}
           <div className="lg:col-span-3 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="text-xl font-black text-slate-900 uppercase italic">Recent Transactions</h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input type="text" placeholder="Search sales..." className="pl-10 pr-4 py-2 bg-slate-50 rounded-xl border-none text-sm font-bold outline-none focus:ring-2 ring-amber-500/20" />
+              <h3 className="text-xl font-black text-slate-900 uppercase italic">Transaction History</h3>
+              <div className="flex items-center gap-4">
+                <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                  {stats.totalTransactions} Sales Found
+                </div>
               </div>
             </div>
             <table className="w-full text-left">
@@ -117,32 +152,36 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {sales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-8 py-5 text-xs font-bold text-slate-500">
-                      {new Date(sale.created_at).toLocaleString()}
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex flex-wrap gap-1">
-                        {sale.items?.map((item: any, i: number) => (
-                          <span key={i} className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-600 uppercase">
-                            {item.name} (x{item.quantity})
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
-                        sale.payment_method === 'M-Pesa' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-                      }`}>
-                        {sale.payment_method}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right font-black italic text-slate-900">
-                      KES {sale.total_amount.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
+                {sales.length === 0 ? (
+                  <tr><td colSpan={4} className="p-20 text-center font-bold text-slate-300 uppercase tracking-widest">No data for this period</td></tr>
+                ) : (
+                  sales.map((sale) => (
+                    <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-5 text-xs font-bold text-slate-500">
+                        {new Date(sale.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className="flex flex-wrap gap-1">
+                          {sale.items?.map((item: any, i: number) => (
+                            <span key={i} className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-600 uppercase">
+                              {item.name} (x{item.quantity})
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
+                          sale.payment_method === 'M-Pesa' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                        }`}>
+                          {sale.payment_method}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5 text-right font-black italic text-slate-900">
+                        KES {sale.total_amount.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
