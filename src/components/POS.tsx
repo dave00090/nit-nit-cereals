@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Search, ShoppingCart, Trash2, Plus, Minus, 
-  CheckCircle, Loader2, Barcode, Wallet 
+  CheckCircle, Loader2, Barcode, Wallet, Printer 
 } from 'lucide-react';
 
 export default function POS() {
@@ -58,7 +58,6 @@ export default function POS() {
     setCart(cart.map(item => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
-        // Prevent quantity from exceeding available stock
         if (delta > 0 && newQty > item.current_stock) {
             alert("Cannot exceed available stock");
             return item;
@@ -71,7 +70,57 @@ export default function POS() {
 
   const total = cart.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
 
-  // --- THE FIXED COMPLETE SALE LOGIC ---
+  // --- RECEIPT GENERATION LOGIC ---
+  const printReceipt = (saleItems: any[], saleTotal: number) => {
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) return;
+
+    const itemsHtml = saleItems.map(item => `
+      <tr>
+        <td style="padding: 5px 0;">${item.name} x${item.quantity}</td>
+        <td style="text-align: right;">KES ${(item.selling_price * item.quantity).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt - Nit-Nit Cereals</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; }
+            table { width: 100%; margin: 20px 0; border-collapse: collapse; }
+            .total { border-top: 2px dashed #000; padding-top: 10px; font-weight: bold; font-size: 1.2em; }
+            .footer { text-align: center; margin-top: 30px; font-size: 0.8em; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>NIT-NIT CEREALS</h2>
+            <p>Quality You Can Trust</p>
+            <p>${new Date().toLocaleString()}</p>
+          </div>
+          <table>
+            ${itemsHtml}
+          </table>
+          <div class="total">
+            <div style="display: flex; justify-content: space-between;">
+              <span>GRAND TOTAL:</span>
+              <span>KES ${saleTotal.toLocaleString()}</span>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Thank you for shopping with us!</p>
+            <p>Goods once sold are not returnable.</p>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // --- UPDATED COMPLETE SALE LOGIC ---
   const completeSale = async () => {
     if (cart.length === 0) return;
     setIsProcessing(true);
@@ -98,10 +147,12 @@ export default function POS() {
       const updateError = results.find(r => r.error);
       if (updateError) throw updateError.error;
 
-      // 3. Success Actions
-      alert("Sale Completed Successfully!");
+      // 3. Print the receipt before clearing state
+      printReceipt(cart, total);
+
+      // 4. Reset
       setCart([]);
-      fetchProducts(); // Refresh stock levels to show updated counts
+      fetchProducts(); 
     } catch (error: any) {
       console.error("Sale Error:", error);
       alert("Sale Failed: " + error.message);
@@ -189,7 +240,7 @@ export default function POS() {
           <button 
             onClick={completeSale}
             disabled={isProcessing || cart.length === 0}
-            className="w-full bg-slate-900 text-amber-500 py-6 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-slate-900 text-amber-500 py-6 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
             {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle size={24}/> COMPLETE SALE</>}
           </button>
