@@ -10,7 +10,7 @@ import POS from './components/POS';
 import SupplierOrders from './components/SupplierOrders';
 import Distributors from './components/Distributors';
 import Expenses from './components/Expenses';
-import Inventory from './components/Inventory';
+import Inventory from './components/Inventory'; // This file manages your 'products' table
 import Reports from './components/Reports';
 
 function Navigation() {
@@ -19,7 +19,7 @@ function Navigation() {
   const menuItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/pos', icon: ShoppingCart, label: 'Point of Sale' },
-    { path: '/inventory', icon: Package, label: 'Inventory' },
+    { path: '/inventory', icon: Package, label: 'Products' }, // Renamed to Products to match your table
     { path: '/supplier-orders', icon: Truck, label: 'Supplier Orders' },
     { path: '/distributors', icon: Users, label: 'Suppliers' },
     { path: '/expenses', icon: Receipt, label: 'Expenses' },
@@ -68,7 +68,7 @@ function Navigation() {
           <div className="p-2 rounded-lg group-hover:bg-red-500/10">
             <LogOut size={20} />
           </div>
-          <span className="tracking-tight">Sign Out</span>
+          <span className="tracking-tight text-sm uppercase">Sign Out</span>
         </button>
       </div>
     </div>
@@ -83,7 +83,7 @@ export default function App() {
         
         {/* MAIN CONTENT AREA */}
         <main className="flex-1 h-screen overflow-y-auto">
-          <div className="p-4 md:p-0">
+          <div className="p-0">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/pos" element={<POS />} />
