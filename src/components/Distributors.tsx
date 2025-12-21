@@ -32,28 +32,33 @@ export default function Distributors() {
 
   async function fetchDistributors() {
     setLoading(true);
-    const { data } = await supabase.from('distributors').select('*').order('name');
+    const { data, error } = await supabase
+      .from('distributors')
+      .select('*')
+      .order('name');
+    
+    if (error) console.error("Fetch error:", error);
     if (data) setDistributors(data);
     setLoading(false);
   }
 
   // --- BULLETPROOF LOG EXPENSE FUNCTION ---
-  const logExpense = async (distName: string, amount: number, note: string) => {
+  const logExpense = async (distName: string, amountValue: number, note: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { error } = await supabase.from('expenses').insert([{
         title: `Supplier Payment: ${distName}`,
-        amount: Number(amount),
+        amount: Number(amountValue), // Using 'amount' as confirmed
         category: 'Supplier Payment',
         description: note,
-        date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-        user_id: user?.id // Only sends if user is logged in
+        date: new Date().toISOString().split('T')[0],
+        user_id: user?.id 
       }]);
 
       if (error) {
         console.error("Expense Log Error:", error.message);
-        alert("Debt updated, but expense record failed. Check console for details.");
+        alert(`Debt updated, but expense record failed: ${error.message}`);
       }
     } catch (err) {
       console.error("System Error logging expense:", err);
@@ -86,7 +91,7 @@ export default function Distributors() {
   };
 
   const handleInstallment = async (dist: Distributor) => {
-    const amountStr = prompt(`Debt: KES ${dist.total_debt.toLocaleString()}\nEnter amount paid:`);
+    const amountStr = prompt(`Current Debt: KES ${dist.total_debt.toLocaleString()}\nEnter amount paid:`);
     if (!amountStr) return;
     const amountPaid = parseFloat(amountStr);
 
@@ -132,10 +137,13 @@ export default function Distributors() {
     setLoading(true);
     try {
       const payload = { ...formData, total_debt: Number(formData.total_debt) };
-      if (editingId) await supabase.from('distributors').update(payload).eq('id', editingId);
-      else await supabase.from('distributors').insert([payload]);
+      if (editingId) {
+        await supabase.from('distributors').update(payload).eq('id', editingId);
+      } else {
+        await supabase.from('distributors').insert([payload]);
+      }
       setIsModalOpen(false);
-      fetchDistributors();
+      await fetchDistributors();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -145,6 +153,7 @@ export default function Distributors() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+      {/* HEADER */}
       <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Suppliers</h1>
@@ -166,6 +175,7 @@ export default function Distributors() {
         </div>
       </div>
 
+      {/* GRID */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {distributors
           .filter(d => d.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -181,10 +191,10 @@ export default function Distributors() {
               </div>
 
               <div className="mb-6">
-                <h3 className="text-xl font-bold text-slate-800 mb-1">{dist.name}</h3>
-                <div className="flex items-center gap-2 text-slate-400">
+                <h3 className="text-xl font-bold text-slate-800 mb-1 tracking-tight">{dist.name}</h3>
+                <div className="flex items-center gap-2 text-slate-400 font-medium">
                   <Phone size={14} />
-                  <span className="text-sm font-medium">{dist.phone}</span>
+                  <span className="text-sm">{dist.phone}</span>
                 </div>
               </div>
 
@@ -217,22 +227,33 @@ export default function Distributors() {
           ))}
       </div>
 
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-8">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-8 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-slate-800">{editingId ? 'Edit Partner' : 'Add Partner'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-400"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-slate-800 tracking-tight">{editingId ? 'Edit Partner' : 'Add Partner'}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-all"><X size={20}/></button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <input required placeholder="Name" className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-amber-500 font-bold"
-                value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-              <input required placeholder="Phone" className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-amber-500 font-bold"
-                value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-              <input type="number" placeholder="Opening Debt" className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-amber-500 font-bold"
-                value={formData.total_debt} onChange={(e) => setFormData({...formData, total_debt: Number(e.target.value)})} />
-              <button type="submit" className="w-full py-4 bg-amber-500 text-white font-black rounded-xl shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Supplier Name</label>
+                <input required className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-amber-500 font-bold mt-1"
+                  value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
+                <input required className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-amber-500 font-bold mt-1"
+                  value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Opening Debt (KES)</label>
+                <input type="number" className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-amber-500 font-bold mt-1"
+                  value={formData.total_debt} onChange={(e) => setFormData({...formData, total_debt: Number(e.target.value)})} />
+              </div>
+
+              <button type="submit" className="w-full py-4 bg-amber-500 text-white font-black rounded-xl shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center gap-2 mt-2">
                 {loading ? <Loader2 className="animate-spin" /> : <><Check size={20}/> Save Partner</>}
               </button>
             </form>
