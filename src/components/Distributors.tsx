@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   UserPlus, Pencil, Trash2, X, Check, Loader2, 
-  Phone, User, Search, History, Package, CreditCard, Receipt
+  Phone, Search, Package, Receipt, CreditCard, Wallet
 } from 'lucide-react';
 
 interface Distributor {
   id: string;
   name: string;
-  contact_person: string;
   phone: string;
-  address: string;
+  total_debt: number;
 }
 
 export default function Distributors() {
@@ -20,11 +19,11 @@ export default function Distributors() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Form State matched to your DB columns
   const [formData, setFormData] = useState({
     name: '',
-    contact_person: '',
     phone: '',
-    address: ''
+    total_debt: 0
   });
 
   useEffect(() => {
@@ -33,10 +32,9 @@ export default function Distributors() {
 
   async function fetchDistributors() {
     setLoading(true);
-    // Basic select to ensure data shows up even if other tables are empty
     const { data, error } = await supabase
       .from('distributors')
-      .select('*')
+      .select('id, name, phone, total_debt')
       .order('name');
     
     if (error) console.error("Fetch error:", error);
@@ -46,7 +44,7 @@ export default function Distributors() {
 
   const handleAddNew = () => {
     setEditingId(null);
-    setFormData({ name: '', contact_person: '', phone: '', address: '' });
+    setFormData({ name: '', phone: '', total_debt: 0 });
     setIsModalOpen(true);
   };
 
@@ -54,9 +52,8 @@ export default function Distributors() {
     setEditingId(dist.id);
     setFormData({
       name: dist.name,
-      contact_person: dist.contact_person,
       phone: dist.phone,
-      address: dist.address
+      total_debt: dist.total_debt
     });
     setIsModalOpen(true);
   };
@@ -66,17 +63,24 @@ export default function Distributors() {
     setLoading(true);
 
     try {
+      // Sending ONLY columns that exist in your DB
+      const payload = {
+        name: formData.name,
+        phone: formData.phone,
+        total_debt: Number(formData.total_debt)
+      };
+
       if (editingId) {
-        const { error } = await supabase.from('distributors').update(formData).eq('id', editingId);
+        const { error } = await supabase.from('distributors').update(payload).eq('id', editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('distributors').insert([formData]);
+        const { error } = await supabase.from('distributors').insert([payload]);
         if (error) throw error;
       }
       setIsModalOpen(false);
       await fetchDistributors();
     } catch (err: any) {
-      alert("Error: " + err.message);
+      alert("Database Error: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -87,24 +91,19 @@ export default function Distributors() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Suppliers</h1>
-          <p className="text-slate-500">Manage partners and financial records</p>
+          <p className="text-slate-500">Managing {distributors.length} active partners</p>
         </div>
         
         <div className="flex w-full md:w-auto gap-3">
           <div className="relative flex-1 md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
-              type="text" 
-              placeholder="Search..."
+              type="text" placeholder="Search..."
               className="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-100 rounded-2xl outline-none focus:border-slate-900 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button 
-            onClick={handleAddNew}
-            className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-black transition-all shadow-lg active:scale-95"
-          >
+          <button onClick={handleAddNew} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-black transition-all shadow-lg active:scale-95">
             <UserPlus size={18} /> Add New
           </button>
         </div>
@@ -117,7 +116,7 @@ export default function Distributors() {
             <div key={dist.id} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all">
               <div className="p-8 space-y-6">
                 <div className="flex justify-between items-start">
-                  <div className="bg-amber-500 p-3 rounded-2xl text-white shadow-lg shadow-amber-100">
+                  <div className="bg-amber-500 p-3 rounded-2xl text-white">
                     <Package size={24} />
                   </div>
                   <button onClick={() => handleEdit(dist)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
@@ -127,44 +126,31 @@ export default function Distributors() {
 
                 <div className="space-y-1">
                   <h3 className="text-2xl font-black text-slate-800 leading-tight">{dist.name}</h3>
-                  <div className="flex flex-col gap-1 pt-2">
-                    <span className="flex items-center gap-2 text-sm text-slate-600 font-bold">
-                      <User size={14} className="text-slate-300" /> {dist.contact_person}
-                    </span>
-                    <span className="flex items-center gap-2 text-sm text-slate-500">
-                      <Phone size={14} className="text-slate-300" /> {dist.phone}
-                    </span>
+                  <div className="flex items-center gap-2 text-slate-500 pt-2">
+                    <Phone size={14} className="text-slate-300" />
+                    <span className="text-sm font-medium">{dist.phone}</span>
                   </div>
                 </div>
 
-                {/* ACTION BUTTONS */}
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button 
-                    onClick={() => alert(`Record full payment for ${dist.name}`)}
-                    className="flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-black transition-all"
-                  >
-                    <Receipt size={14}/> Record Payment
-                  </button>
-                  <button 
-                    onClick={() => alert(`Pay installment for ${dist.name}`)}
-                    className="flex items-center justify-center gap-2 bg-white border-2 border-slate-100 text-slate-700 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider hover:border-slate-900 transition-all"
-                  >
-                    <CreditCard size={14}/> Pay Installment
-                  </button>
+                {/* DEBT STAT CARD */}
+                <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-red-600 text-white p-2 rounded-xl"><Wallet size={16} /></div>
+                    <span className="text-[10px] font-black text-red-700 uppercase tracking-widest">Outstanding Debt</span>
+                  </div>
+                  <span className="text-xl font-black text-red-700 font-mono">KES {dist.total_debt?.toLocaleString()}</span>
                 </div>
-              </div>
 
-              <div className="bg-slate-50 p-6 border-t border-slate-100 mt-auto">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                  <History size={12}/> Address
-                </p>
-                <p className="text-sm font-medium text-slate-600">{dist.address}</p>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button onClick={() => alert(`Full Payment`)} className="flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl text-[10px] font-black uppercase hover:bg-black transition-all"><Receipt size={14}/> Record Payment</button>
+                  <button onClick={() => alert(`Installment`)} className="flex items-center justify-center gap-2 bg-white border-2 border-slate-100 text-slate-700 py-3 rounded-xl text-[10px] font-black uppercase hover:border-slate-900 transition-all"><CreditCard size={14}/> Pay Installment</button>
+                </div>
               </div>
             </div>
         ))}
       </div>
 
-      {/* MODAL */}
+      {/* MODAL MATCHED TO SCHEMA */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -174,29 +160,19 @@ export default function Distributors() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-5">
-              <input 
-                required placeholder="Distributor Name"
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold"
-                value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
-              />
-              <input 
-                required placeholder="Contact Person"
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold"
-                value={formData.contact_person} onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <input required placeholder="Phone Number" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold text-sm"
-                  value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                />
-                <input required placeholder="Location" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold text-sm"
-                  value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}
-                />
+              <input required placeholder="Name" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold"
+                value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+              
+              <input required placeholder="Phone Number" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold"
+                value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+              
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Initial Debt (Optional)</label>
+                <input type="number" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3.5 outline-none focus:border-slate-900 font-bold"
+                  value={formData.total_debt} onChange={(e) => setFormData({...formData, total_debt: Number(e.target.value)})} />
               </div>
 
-              <button 
-                type="submit" 
-                className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
+              <button type="submit" className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-2">
                 {loading ? <Loader2 className="animate-spin" size={20}/> : <><Check size={20}/> Save Partner</>}
               </button>
             </form>
