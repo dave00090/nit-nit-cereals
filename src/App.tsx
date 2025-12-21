@@ -1,26 +1,27 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, ShoppingCart, Users, 
-  Receipt, Truck, LogOut, Package 
+  Receipt, Truck, Package, BarChart3, LogOut 
 } from 'lucide-react';
 
-// --- UPDATED IMPORTS TO MATCH YOUR FILENAMES ---
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import SupplierOrders from './components/SupplierOrders';
 import Distributors from './components/Distributors';
 import Expenses from './components/Expenses';
-import Inventory from './components/Inventory'; // Changed from Products to Inventory
+import Inventory from './components/Inventory';
+import Reports from './components/Reports';
 
 function Navigation() {
   const location = useLocation();
   const menuItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/pos', icon: ShoppingCart, label: 'Point of Sale' },
-    { path: '/inventory', icon: Package, label: 'Inventory' }, // Updated path
+    { path: '/inventory', icon: Package, label: 'Inventory' },
     { path: '/supplier-orders', icon: Truck, label: 'Supplier Orders' },
     { path: '/distributors', icon: Users, label: 'Suppliers' },
     { path: '/expenses', icon: Receipt, label: 'Expenses' },
+    { path: '/reports', icon: BarChart3, label: 'Reports' },
   ];
 
   return (
@@ -29,7 +30,7 @@ function Navigation() {
         <div className="bg-amber-500 p-2 rounded-lg">
           <Package className="text-white" size={24} />
         </div>
-        <span className="text-white font-black text-xl tracking-tight uppercase">Nit-Nit Cereals</span>
+        <span className="text-white font-black text-xl tracking-tight uppercase leading-none">Nit-Nit Cereals</span>
       </div>
       <nav className="flex-1 space-y-1">
         {menuItems.map((item) => {
@@ -40,7 +41,7 @@ function Navigation() {
               key={item.path}
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                isActive ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                isActive ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
               }`}
             >
               <Icon size={20} />
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/supplier-orders" element={<SupplierOrders />} />
             <Route path="/distributors" element={<Distributors />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/reports" element={<Reports />} />
           </Routes>
         </main>
       </div>
