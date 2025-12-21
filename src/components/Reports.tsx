@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   BarChart3, TrendingUp, Calendar, Wallet, 
-  Package, ArrowUpRight, ArrowDownRight, Loader2, Search
+  Package, ArrowUpRight, ArrowDownRight, Loader2, Search, TrendingDown, Scale
 } from 'lucide-react';
 
 export default function Reports() {
   const [sales, setSales] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]); // New State
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalRevenue: 0,
-    totalProfit: 0,
+    grossProfit: 0,
+    totalExpenses: 0, // New Stat
+    netProfit: 0,      // New Stat
     cashSales: 0,
     mpesaSales: 0,
     totalTransactions: 0
@@ -22,41 +25,50 @@ export default function Reports() {
 
   async function fetchSalesData() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('sales')
-      .select('*')
-      .order('created_at', { ascending: false });
+    
+    // Fetch both Sales and Expenses in parallel
+    const [salesRes, expensesRes] = await Promise.all([
+      supabase.from('sales').select('*').order('created_at', { ascending: false }),
+      supabase.from('expenses').select('*')
+    ]);
 
-    if (!error && data) {
-      setSales(data);
-      calculateStats(data);
+    if (salesRes.data && expensesRes.data) {
+      setSales(salesRes.data);
+      setExpenses(expensesRes.data);
+      calculateStats(salesRes.data, expensesRes.data);
     }
     setLoading(false);
   }
 
-  const calculateStats = (salesData: any[]) => {
+  const calculateStats = (salesData: any[], expensesData: any[]) => {
     let revenue = 0;
-    let profit = 0;
+    let grossProfit = 0;
     let cash = 0;
     let mpesa = 0;
 
+    // Calculate Sales Stats
     salesData.forEach(sale => {
       revenue += Number(sale.total_amount);
       if (sale.payment_method === 'Cash') cash += Number(sale.total_amount);
       if (sale.payment_method === 'M-Pesa') mpesa += Number(sale.total_amount);
       
-      // Calculate profit from items array
       if (sale.items && Array.isArray(sale.items)) {
         sale.items.forEach((item: any) => {
-          const itemProfit = (Number(item.selling_price) - Number(item.cost_price)) * Number(item.quantity);
-          profit += itemProfit;
+          const itemProfit = (Number(item.selling_price) - Number(item.cost_price || 0)) * Number(item.quantity);
+          grossProfit += itemProfit;
         });
       }
     });
 
+    // Calculate Expenses
+    const totalExpenses = expensesData.reduce((sum, exp) => sum + Number(exp.amount), 0);
+    const netProfit = grossProfit - totalExpenses;
+
     setStats({
       totalRevenue: revenue,
-      totalProfit: profit,
+      grossProfit: grossProfit,
+      totalExpenses: totalExpenses,
+      netProfit: netProfit,
       cashSales: cash,
       mpesaSales: mpesa,
       totalTransactions: salesData.length
@@ -77,12 +89,12 @@ export default function Reports() {
           <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Financial Overview & Analytics</p>
         </header>
 
-        {/* KEY STATS GRID */}
+        {/* KEY STATS GRID - Updated with Net Profit */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <ReportCard title="Total Revenue" value={`KES ${stats.totalRevenue.toLocaleString()}`} icon={<TrendingUp />} color="slate" />
-          <ReportCard title="Estimated Profit" value={`KES ${stats.totalProfit.toLocaleString()}`} icon={<ArrowUpRight />} color="emerald" />
-          <ReportCard title="M-Pesa Total" value={`KES ${stats.mpesaSales.toLocaleString()}`} icon={<Wallet />} color="amber" />
-          <ReportCard title="Transactions" value={stats.totalTransactions.toString()} icon={<Package />} color="blue" />
+          <ReportCard title="Total Expenses" value={`KES ${stats.totalExpenses.toLocaleString()}`} icon={<TrendingDown className="text-red-500" />} color="white" />
+          <ReportCard title="Gross Profit" value={`KES ${stats.grossProfit.toLocaleString()}`} icon={<Scale className="text-blue-500" />} color="white" />
+          <ReportCard title="Net Profit" value={`KES ${stats.netProfit.toLocaleString()}`} icon={<ArrowUpRight />} color="emerald" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -145,13 +157,14 @@ function ReportCard({ title, value, icon, color }: any) {
     amber: "bg-amber-50 text-amber-500", 
     slate: "bg-slate-900 text-white", 
     emerald: "bg-emerald-50 text-emerald-600",
-    blue: "bg-blue-50 text-blue-500"
+    blue: "bg-blue-50 text-blue-500",
+    white: "bg-white text-slate-900"
   };
   return (
     <div className={`p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between h-32 transition-all hover:scale-[1.02] ${color === 'slate' ? 'bg-slate-900' : 'bg-white'}`}>
       <div className="flex justify-between items-start">
         <p className={`${color === 'slate' ? 'text-slate-400' : 'text-slate-400'} text-[10px] font-black uppercase tracking-widest`}>{title}</p>
-        <div className={`p-2 rounded-lg ${color === 'slate' ? 'bg-white/10 text-white' : colors[color]}`}>{icon}</div>
+        <div className={`p-2 rounded-lg ${color === 'slate' ? 'bg-white/10 text-white' : (colors[color] || "bg-slate-50")}`}>{icon}</div>
       </div>
       <p className={`text-2xl font-black italic ${color === 'slate' ? 'text-white' : 'text-slate-900'}`}>{value}</p>
     </div>
