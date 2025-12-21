@@ -46,14 +46,31 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- NEW: FETCH SUPPLIERS FOR DROPDOWN ---
+  // --- DEBUGGED FETCH SUPPLIERS ---
   async function fetchSuppliers() {
     const { data, error } = await supabase
       .from('suppliers')
       .select('id, name')
       .order('name', { ascending: true });
-    if (!error && data) setSuppliers(data);
+    
+    if (error) {
+      alert("Database Error fetching suppliers: " + error.message);
+      return;
+    }
+
+    if (data) {
+      console.log("Suppliers loaded:", data);
+      setSuppliers(data);
+    }
   }
+
+  // --- TRIGGER REFRESH WHEN OPENING MODAL ---
+  const handleOpenModal = () => {
+    setEditingProduct(null);
+    setFormData(initialForm);
+    fetchSuppliers(); // Re-fetch to ensure list is current
+    setIsModalOpen(true);
+  };
 
   const handleBarcodeLookup = async () => {
     if (!formData.barcode) return;
@@ -95,7 +112,6 @@ export default function Inventory() {
     } else {
       result = await supabase.from('products').insert([submissionData]);
       
-      // AUTO-LOG TO SUPPLIER HISTORY
       if (!result.error && formData.supplier_id && formData.current_stock > 0) {
         await supabase.from('supplier_purchases').insert([{
           supplier_id: formData.supplier_id,
@@ -114,7 +130,7 @@ export default function Inventory() {
       setEditingProduct(null);
       setFormData(initialForm);
       fetchProducts();
-      fetchSuppliers(); // Refresh list to catch any new ones
+      fetchSuppliers(); 
     }
     setLoading(false);
   };
@@ -131,7 +147,7 @@ export default function Inventory() {
             <button onClick={() => { fetchProducts(); fetchSuppliers(); }} className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-400 hover:text-amber-500 transition-all shadow-sm">
               <RefreshCw size={24} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button onClick={() => { setEditingProduct(null); setFormData(initialForm); setIsModalOpen(true); }}
+            <button onClick={handleOpenModal}
               className="bg-amber-500 text-slate-900 px-8 py-4 rounded-2xl font-black shadow-xl hover:bg-amber-400 transition-all flex items-center gap-2">
               <Plus size={20} strokeWidth={3} /> ADD PRODUCT
             </button>
@@ -207,18 +223,19 @@ export default function Inventory() {
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
-              {/* UPDATED SUPPLIER SELECTOR */}
+              {/* UPDATED SUPPLIER SELECTOR WITH DEBUG COUNT */}
               <div className="col-span-2 space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                  <Truck size={12} /> Source Supplier
+                  <Truck size={12} /> Source Supplier ({suppliers.length} found)
                 </label>
-                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 appearance-none"
+                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
                   value={formData.supplier_id} onChange={e => setFormData({...formData, supplier_id: e.target.value})}>
                   <option value="">Select a Supplier...</option>
                   {suppliers.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
+                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">No suppliers found. Check the Suppliers page.</p>}
               </div>
 
               <div className="space-y-1">
