@@ -1,23 +1,23 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, ShoppingCart, Package, Users, 
-  Receipt, Truck, LogOut 
+  LayoutDashboard, ShoppingCart, Users, 
+  Receipt, Truck, LogOut, Package 
 } from 'lucide-react';
 
-// --- ALL IMPORTS POINTING TO COMPONENTS FOLDER ---
+// --- UPDATED IMPORTS TO MATCH YOUR FILENAMES ---
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import SupplierOrders from './components/SupplierOrders';
-import Products from './components/Products';
 import Distributors from './components/Distributors';
 import Expenses from './components/Expenses';
+import Inventory from './components/Inventory'; // Changed from Products to Inventory
 
 function Navigation() {
   const location = useLocation();
   const menuItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/pos', icon: ShoppingCart, label: 'Point of Sale' },
-    { path: '/products', icon: Package, label: 'Inventory' },
+    { path: '/inventory', icon: Package, label: 'Inventory' }, // Updated path
     { path: '/supplier-orders', icon: Truck, label: 'Supplier Orders' },
     { path: '/distributors', icon: Users, label: 'Suppliers' },
     { path: '/expenses', icon: Receipt, label: 'Expenses' },
@@ -40,7 +40,7 @@ function Navigation() {
               key={item.path}
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                isActive ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                isActive ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               <Icon size={20} />
@@ -62,7 +62,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/pos" element={<POS />} />
-            <Route path="/products" element={<Products />} />
+            <Route path="/inventory" element={<Inventory />} />
             <Route path="/supplier-orders" element={<SupplierOrders />} />
             <Route path="/distributors" element={<Distributors />} />
             <Route path="/expenses" element={<Expenses />} />
