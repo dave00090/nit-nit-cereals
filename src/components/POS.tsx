@@ -73,46 +73,70 @@ export default function POS() {
 
   const printReceipt = (saleItems: any[], saleTotal: number, method: string) => {
     const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) return;
+    if (!printWindow) {
+      alert("Please allow pop-ups to print receipts");
+      return;
+    }
 
     const itemsHtml = saleItems.map(item => `
       <tr>
-        <td style="padding: 5px 0;">${item.name} x${item.quantity}</td>
-        <td style="text-align: right;">KES ${(item.selling_price * item.quantity).toLocaleString()}</td>
+        <td style="padding: 5px 0; font-size: 14px;">${item.name} x${item.quantity}</td>
+        <td style="text-align: right; font-size: 14px;">KES ${(item.selling_price * item.quantity).toLocaleString()}</td>
       </tr>
     `).join('');
 
-    printWindow.document.write(`
+    const htmlContent = `
       <html>
         <head>
           <title>Receipt - Nit-Nit Cereals</title>
           <style>
-            body { font-family: 'Courier New', Courier, monospace; padding: 20px; color: #333; line-height: 1.2; }
-            .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; }
-            table { width: 100%; margin: 20px 0; border-collapse: collapse; }
-            .total { border-top: 2px dashed #000; padding-top: 10px; font-weight: bold; }
-            .footer { text-align: center; margin-top: 30px; font-size: 0.8em; }
+            body { font-family: 'Courier New', Courier, monospace; padding: 20px; color: #333; line-height: 1.4; }
+            .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+            table { width: 100%; margin: 10px 0; border-collapse: collapse; }
+            .total-section { border-top: 2px dashed #000; padding-top: 10px; margin-top: 10px; }
+            .grand-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; }
+            .method { font-size: 12px; margin-top: 4px; color: #666; }
+            .footer { text-align: center; margin-top: 40px; font-size: 12px; }
+            @media print { .no-print { display: none; } }
           </style>
         </head>
         <body>
           <div class="header">
-            <h2>NIT-NIT CEREALS</h2>
-            <p>Quality You Can Trust</p>
-            <p>${new Date().toLocaleString()}</p>
+            <h2 style="margin: 0;">NIT-NIT CEREALS</h2>
+            <p style="margin: 5px 0;">Quality You Can Trust</p>
+            <p style="margin: 0; font-size: 12px;">${new Date().toLocaleString()}</p>
           </div>
-          <table>${itemsHtml}</table>
-          <div class="total">
-            <div style="display: flex; justify-content: space-between; font-size: 1.2em;">
-              <span>TOTAL:</span>
+          <table>
+            <thead>
+              <tr style="border-bottom: 1px solid #eee;">
+                <th style="text-align: left; font-size: 12px; padding-bottom: 5px;">Item</th>
+                <th style="text-align: right; font-size: 12px; padding-bottom: 5px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <div class="total-section">
+            <div class="grand-total">
+              <span>TOTAL</span>
               <span>KES ${saleTotal.toLocaleString()}</span>
             </div>
-            <div style="font-size: 0.8em; margin-top: 5px;">Method: ${method}</div>
+            <div class="method">Paid via: ${method}</div>
           </div>
-          <div class="footer"><p>Thank you for shopping!</p></div>
-          <script>window.print(); window.close();</script>
+          <div class="footer">
+            <p>Thank you for shopping with us!</p>
+            <p>Goods once sold are not returnable.</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() { window.close(); };
+            };
+          </script>
         </body>
       </html>
-    `);
+    `;
+
+    printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
 
@@ -193,10 +217,16 @@ export default function POS() {
           <div className="bg-amber-500 p-3 rounded-2xl text-slate-900 shadow-lg shadow-amber-500/20">
             <ShoppingCart size={24} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase">Cart</h2>
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Cart</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2">
+          {cart.length === 0 && (
+            <div className="text-center py-20 opacity-20">
+              <ShoppingCart size={64} className="mx-auto mb-4 text-slate-300" />
+              <p className="font-black uppercase tracking-widest text-xs">Waiting for items...</p>
+            </div>
+          )}
           {cart.map(item => (
             <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="flex-1 min-w-0 mr-4">
@@ -218,8 +248,18 @@ export default function POS() {
         <div className="mb-6">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Payment Method</p>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setPaymentMethod('Cash')} className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}><Banknote size={18} /> Cash</button>
-            <button onClick={() => setPaymentMethod('M-Pesa')} className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}><CreditCard size={18} /> M-Pesa</button>
+            <button 
+              onClick={() => setPaymentMethod('Cash')} 
+              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'Cash' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}
+            >
+              <Banknote size={18} /> Cash
+            </button>
+            <button 
+              onClick={() => setPaymentMethod('M-Pesa')} 
+              className={`flex items-center justify-center gap-2 p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}
+            >
+              <CreditCard size={18} /> M-Pesa
+            </button>
           </div>
         </div>
 
@@ -228,7 +268,11 @@ export default function POS() {
             <span className="text-slate-400 font-black uppercase tracking-widest text-xs">Total</span>
             <span className="text-4xl font-black text-slate-900 italic">KES {total.toLocaleString()}</span>
           </div>
-          <button onClick={completeSale} disabled={isProcessing || cart.length === 0} className="w-full bg-slate-900 text-amber-500 py-6 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+          <button 
+            onClick={completeSale} 
+            disabled={isProcessing || cart.length === 0} 
+            className="w-full bg-slate-900 text-amber-500 py-6 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+          >
             {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle size={24}/> COMPLETE SALE</>}
           </button>
         </div>
