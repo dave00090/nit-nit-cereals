@@ -4,15 +4,13 @@ import {
   Receipt, Truck, LogOut 
 } from 'lucide-react';
 
-// COMPONENTS FOLDER
+// --- ALL IMPORTS POINTING TO COMPONENTS FOLDER ---
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import SupplierOrders from './components/SupplierOrders';
-
-// PAGES FOLDER
-import Products from './pages/Products';
-import Distributors from './pages/Distributors';
-import Expenses from './pages/Expenses';
+import Products from './components/Products';
+import Distributors from './components/Distributors';
+import Expenses from './components/Expenses';
 
 function Navigation() {
   const location = useLocation();
@@ -42,7 +40,7 @@ function Navigation() {
               key={item.path}
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                isActive ? 'bg-amber-500 text-white' : 'text-slate-400 hover:bg-slate-800'
+                isActive ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               <Icon size={20} />
