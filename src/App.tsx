@@ -9,15 +9,17 @@ import {
   LogOut 
 } from 'lucide-react';
 
-// Import your pages/components
+// Import Pages (from src/pages)
 import Dashboard from './pages/Dashboard';
-import POS from './components/POS';
 import Products from './pages/Products';
 import Distributors from './pages/Distributors';
 import Expenses from './pages/Expenses';
+
+// Import Components (from src/components)
+import POS from './components/POS';
 import SupplierOrders from './components/SupplierOrders';
 
-// This sub-component creates the Sidebar menu internally
+// Navigation Sidebar Component
 function Navigation() {
   const location = useLocation();
 
@@ -71,15 +73,12 @@ function Navigation() {
   );
 }
 
-// MAIN APP COMPONENT
+// Main App Component
 export default function App() {
   return (
     <Router>
       <div className="flex min-h-screen bg-slate-50">
-        {/* Navigation Sidebar */}
         <Navigation />
-
-        {/* Main Content Area */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto">
           <Routes>
             <Route path="/" element={<Dashboard />} />
