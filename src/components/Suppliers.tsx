@@ -55,25 +55,31 @@ export default function Suppliers() {
     setLoading(false);
   }
 
+  // --- UPDATED HANDLESUBMIT INTEGRATION ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.name) return alert("Company Name is required!");
+    
     setLoading(true);
 
     const { error } = await supabase
       .from('suppliers')
-      .insert([{
-        name: formData.name,
-        contact_person: formData.contact_person,
-        phone: formData.phone,
-        category: formData.category
-      }]);
+      .insert([
+        {
+          name: formData.name,
+          contact_person: formData.contact_person,
+          phone: formData.phone,
+          category: formData.category
+        }
+      ]);
 
     if (error) {
-      alert("Error saving supplier: " + error.message);
+      alert("Error: " + error.message);
     } else {
+      alert("SUCCESS: " + formData.name + " added to Registry!");
       setIsModalOpen(false);
       setFormData({ name: '', contact_person: '', phone: '', category: 'Wholesaler' });
-      fetchData();
+      fetchData(); // Refresh the local list immediately
     }
     setLoading(false);
   };

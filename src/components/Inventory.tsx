@@ -48,6 +48,7 @@ export default function Inventory() {
 
   // --- RE-SYNCED FETCH WITH CACHE BUSTING & LOGGING ---
   async function fetchSuppliers() {
+    // We explicitly call for id and name to ensure the dropdown has what it needs
     const { data, error } = await supabase
       .from('suppliers')
       .select('id, name')
@@ -67,7 +68,7 @@ export default function Inventory() {
     setEditingProduct(null);
     setFormData(initialForm);
     
-    // Force immediate re-fetch to bypass any browser state lag
+    // Force immediate re-fetch to bypass any browser state lag or cache
     await fetchSuppliers(); 
     
     setIsModalOpen(true);
@@ -113,6 +114,7 @@ export default function Inventory() {
     } else {
       result = await supabase.from('products').insert([submissionData]);
       
+      // AUTO-LOG TO SUPPLIER HISTORY
       if (!result.error && formData.supplier_id && formData.current_stock > 0) {
         await supabase.from('supplier_purchases').insert([{
           supplier_id: formData.supplier_id,
