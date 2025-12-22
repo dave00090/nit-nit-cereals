@@ -45,8 +45,9 @@ export default function Suppliers() {
 
   async function fetchData() {
     setLoading(true);
+    // Pointing to 'distributors' as confirmed in your database
     const [supRes, purRes] = await Promise.all([
-      supabase.from('suppliers').select('*').order('name'),
+      supabase.from('distributors').select('*').order('name'),
       supabase.from('supplier_purchases').select('*').order('purchase_date', { ascending: false })
     ]);
     
@@ -55,16 +56,14 @@ export default function Suppliers() {
     setLoading(false);
   }
 
-  // --- UPDATED HANDLESUBMIT INTEGRATION ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return alert("Company Name is required!");
     
     setLoading(true);
 
-    // Using .select() to confirm exactly what the DB saved
     const { data, error } = await supabase
-      .from('suppliers')
+      .from('distributors')
       .insert([
         {
           name: formData.name,
@@ -81,17 +80,26 @@ export default function Suppliers() {
       alert("SUCCESS: " + data[0].name + " added to Registry!");
       setIsModalOpen(false);
       setFormData({ name: '', contact_person: '', phone: '', category: 'Wholesaler' });
-      fetchData(); // Refresh the local list immediately
+      fetchData(); 
     }
     setLoading(false);
   };
 
-  const deleteSupplier = async (id: string) => {
-    if (!confirm("Are you sure? This will also remove their supply history.")) return;
-    const { error } = await supabase.from('suppliers').delete().eq('id', id);
-    if (!error) {
+  // --- FIXED INDIVIDUAL DELETE WORKING ---
+  const deleteSupplier = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete ${name}? This will also remove their supply history.`)) return;
+    
+    const { error } = await supabase
+      .from('distributors')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert("Delete failed: " + error.message);
+    } else {
       setSelectedSupplier(null);
-      fetchData();
+      // Update UI immediately
+      setSuppliers(suppliers.filter(s => s.id !== id));
     }
   };
 
@@ -103,7 +111,7 @@ export default function Suppliers() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <div>
             <h1 className="text-4xl font-black text-slate-900 uppercase italic tracking-tighter">Supplier Network</h1>
-            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Procurement & Sourcing Database</p>
+            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Registry: {suppliers.length} Partners</p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -130,30 +138,38 @@ export default function Suppliers() {
 
             <div className="space-y-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
               {suppliers
-                .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(s => s.name?.toLowerCase().includes(searchTerm.toLowerCase()))
                 .map(sup => (
-                <button 
-                  key={sup.id}
-                  onClick={() => setSelectedSupplier(sup)}
-                  className={`w-full text-left p-6 rounded-[2rem] border transition-all group ${
-                    selectedSupplier?.id === sup.id 
-                    ? 'bg-slate-900 border-slate-900 text-white shadow-2xl' 
-                    : 'bg-white border-slate-200 text-slate-900 hover:border-amber-500'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className={`text-[9px] font-black uppercase mb-1 tracking-widest ${selectedSupplier?.id === sup.id ? 'text-amber-500' : 'text-slate-400'}`}>
-                        {sup.category}
-                      </p>
-                      <h4 className="font-black uppercase text-lg italic leading-tight">{sup.name}</h4>
+                <div key={sup.id} className="relative group">
+                  <button 
+                    onClick={() => setSelectedSupplier(sup)}
+                    className={`w-full text-left p-6 rounded-[2rem] border transition-all ${
+                      selectedSupplier?.id === sup.id 
+                      ? 'bg-slate-900 border-slate-900 text-white shadow-2xl' 
+                      : 'bg-white border-slate-200 text-slate-900 hover:border-amber-500'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className={`text-[9px] font-black uppercase mb-1 tracking-widest ${selectedSupplier?.id === sup.id ? 'text-amber-500' : 'text-slate-400'}`}>
+                          {sup.category || 'Partner'}
+                        </p>
+                        <h4 className="font-black uppercase text-lg italic leading-tight">{sup.name}</h4>
+                      </div>
                     </div>
-                    <ChevronRight size={20} className={selectedSupplier?.id === sup.id ? 'text-amber-500' : 'text-slate-200'} />
-                  </div>
-                  <div className="mt-4 flex items-center gap-4 text-[11px] font-bold opacity-70">
-                    <span className="flex items-center gap-1"><Phone size={14} /> {sup.phone}</span>
-                  </div>
-                </button>
+                    <div className="mt-4 flex items-center gap-4 text-[11px] font-bold opacity-70">
+                      <span className="flex items-center gap-1"><Phone size={14} /> {sup.phone}</span>
+                    </div>
+                  </button>
+                  
+                  {/* INDIVIDUAL DELETE BUTTON ON CARD */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteSupplier(sup.id, sup.name); }}
+                    className="absolute top-4 right-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -169,18 +185,19 @@ export default function Suppliers() {
                     </h2>
                     <div className="flex gap-4 mt-2">
                        <span className="text-slate-500 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1">
-                        <User size={12}/> {selectedSupplier.contact_person}
+                        <User size={12}/> {selectedSupplier.contact_person || 'N/A'}
                        </span>
                        <span className="text-slate-500 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1">
                         <Phone size={12}/> {selectedSupplier.phone}
                        </span>
                     </div>
                   </div>
+                  {/* HEADER DELETE BUTTON */}
                   <button 
-                    onClick={() => deleteSupplier(selectedSupplier.id)}
-                    className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                    onClick={() => deleteSupplier(selectedSupplier.id, selectedSupplier.name)}
+                    className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 font-black text-xs uppercase"
                   >
-                    <Trash2 size={20} />
+                    <Trash2 size={20} /> Delete Partner
                   </button>
                 </div>
 
@@ -202,9 +219,11 @@ export default function Suppliers() {
                       <tbody className="divide-y divide-slate-50">
                         {purchases.filter(p => p.supplier_id === selectedSupplier.id).length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="py-20 text-center flex flex-col items-center opacity-20">
-                              <Package size={48} strokeWidth={1} />
-                              <p className="font-black uppercase text-xs mt-2">No items supplied yet</p>
+                            <td colSpan={4} className="py-20 text-center">
+                              <div className="flex flex-col items-center opacity-20">
+                                <Package size={48} strokeWidth={1} />
+                                <p className="font-black uppercase text-xs mt-2">No items supplied yet</p>
+                              </div>
                             </td>
                           </tr>
                         ) : (
@@ -228,7 +247,7 @@ export default function Suppliers() {
               <div className="h-[600px] bg-slate-100/50 rounded-[3rem] border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 p-20">
                 <Truck size={80} strokeWidth={1} className="mb-4 opacity-20" />
                 <p className="font-black uppercase tracking-[0.2em] text-center text-sm">
-                  Select a supplier profile<br/>to view detailed records
+                  Select a partner profile<br/>to view records
                 </p>
               </div>
             )}
@@ -241,7 +260,7 @@ export default function Suppliers() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[3rem] w-full max-w-lg p-10 shadow-2xl animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-10">
-              <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">New Supplier</h2>
+              <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">New Partner Entry</h2>
               <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-red-500 transition-colors">
                 <X size={20}/>
               </button>
@@ -249,7 +268,7 @@ export default function Suppliers() {
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Supplier / Company Name</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company / Partner Name</label>
                 <input 
                   required 
                   className="w-full bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 transition-all" 
@@ -297,7 +316,7 @@ export default function Suppliers() {
                 disabled={loading}
                 className="w-full py-5 bg-slate-900 text-amber-500 font-black rounded-[2rem] uppercase tracking-widest text-sm shadow-xl hover:bg-slate-800 transition-all mt-4 disabled:opacity-50"
               >
-                {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Register Supplier'}
+                {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Register Partner'}
               </button>
             </form>
           </div>
