@@ -46,33 +46,26 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- EXTREMELY AGGRESSIVE FETCH POINTED TO DISTRIBUTORS TABLE ---
+  // --- FETCH FROM DISTRIBUTORS TABLE ---
   async function fetchSuppliers() {
-    const syncId = new Date().getTime(); // Unique ID to bypass cache
-    
+    const syncId = new Date().getTime(); 
     const { data, error } = await supabase
-      .from('distributors') // TARGETING YOUR REAL PARTNER TABLE
+      .from('distributors') 
       .select('id, name')
       .not('name', 'is', null) 
       .order('name', { ascending: true });
     
     if (error) {
       console.error(`[Sync ${syncId}] Registry Error:`, error.message);
-      alert("Partner Sync Error: " + error.message);
     } else {
-      console.log(`[Sync ${syncId}] SUCCESS: Found ${data?.length || 0} partners`);
       setSuppliers(data || []);
     }
   }
 
-  // --- TRIGGER REFRESH WHEN OPENING MODAL ---
   const handleOpenModal = async () => {
     setEditingProduct(null);
     setFormData(initialForm);
-    
-    // Aggressive re-fetch at the exact moment of button click
     await fetchSuppliers(); 
-    
     setIsModalOpen(true);
   };
 
@@ -89,25 +82,29 @@ export default function Inventory() {
           description: data.product.generic_name || data.product.categories || '',
           category: data.product.main_category?.split(':')[1] || 'Cereals'
         });
-      } else {
-        alert("Barcode not found in universal list. Please enter details manually.");
       }
     } catch (e) {
-      alert("Search failed. Please check your internet connection.");
+      console.error("Lookup failed");
     }
     setLoading(false);
   };
 
+  // --- INTEGRATED UPDATED SAVE LOGIC ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     const submissionData = {
-      ...formData,
+      name: formData.name,
+      description: formData.description,
+      barcode: formData.barcode,
+      category: formData.category,
+      unit: formData.unit,
       cost_price: Number(formData.cost_price),
       selling_price: Number(formData.selling_price),
       current_stock: Number(formData.current_stock),
-      reorder_level: Number(formData.reorder_level)
+      reorder_level: Number(formData.reorder_level),
+      supplier_id: formData.supplier_id || null // Link product to distributor
     };
 
     let result;
@@ -116,6 +113,7 @@ export default function Inventory() {
     } else {
       result = await supabase.from('products').insert([submissionData]);
       
+      // Also log a purchase entry if a supplier is selected
       if (!result.error && formData.supplier_id && formData.current_stock > 0) {
         await supabase.from('supplier_purchases').insert([{
           supplier_id: formData.supplier_id,
@@ -160,39 +158,38 @@ export default function Inventory() {
 
         <div className="mb-8 relative max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input type="text" placeholder="Search name or scan barcode..." className="w-full bg-white border border-slate-200 pl-12 pr-4 py-4 rounded-2xl font-bold focus:border-amber-500 outline-none shadow-sm"
+          <input type="text" placeholder="Search stock..." className="w-full bg-white border border-slate-200 pl-12 pr-4 py-4 rounded-2xl font-bold focus:border-amber-500 outline-none shadow-sm"
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.barcode || '').includes(searchTerm)).map(product => (
+          {products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())).map(product => (
             <div key={product.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm hover:border-amber-500 transition-all group relative overflow-hidden">
               <div className="flex justify-between items-start mb-4">
                 <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase ${
                   Number(product.current_stock) <= Number(product.reorder_level) ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
                 }`}>
-                  <div className={`h-1.5 w-1.5 rounded-full ${Number(product.current_stock) <= Number(product.reorder_level) ? 'bg-red-600 animate-pulse' : 'bg-emerald-600'}`} />
                   {Number(product.current_stock) <= Number(product.reorder_level) ? 'Low Stock' : 'In Stock'}
                 </div>
                 
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => { setEditingProduct(product); setFormData(product); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-500 transition-colors"><Edit3 size={18}/></button>
-                  <button onClick={async () => { if(confirm('Delete?')) { await supabase.from('products').delete().eq('id', product.id); fetchProducts(); }}} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                  <button onClick={() => { setEditingProduct(product); setFormData(product); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-500"><Edit3 size={18}/></button>
+                  <button onClick={async () => { if(confirm('Delete?')) { await supabase.from('products').delete().eq('id', product.id); fetchProducts(); }}} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={18}/></button>
                 </div>
               </div>
 
               <h3 className="text-xl font-black text-slate-900 uppercase truncate mb-1">{product.name}</h3>
               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">
-                {product.category || 'Rice'} • {product.unit || 'Pieces'}
+                {product.category} • {product.unit}
               </p>
               
               <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-4 flex justify-between items-end">
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Stock</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Stock</p>
                   <p className="text-3xl font-black italic text-slate-900">{product.current_stock}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Selling Price</p>
+                  <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Price</p>
                   <p className="text-xl font-black text-slate-900 italic">KES {product.selling_price}</p>
                 </div>
               </div>
@@ -203,10 +200,10 @@ export default function Inventory() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in duration-200">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-black text-slate-900 uppercase italic">{editingProduct ? 'Edit variety' : 'Register New Product'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+              <h2 className="text-2xl font-black text-slate-900 uppercase italic">{editingProduct ? 'Edit Variety' : 'Register New Product'}</h2>
+              <button onClick={() => setIsModalOpen(false)}><X size={20}/></button>
             </div>
             
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-5">
@@ -217,13 +214,7 @@ export default function Inventory() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                     <Truck size={12} /> Source Partner ({suppliers.length} found)
                   </label>
-                  <button 
-                    type="button" 
-                    onClick={fetchSuppliers} 
-                    className="text-[9px] font-black uppercase text-amber-600 hover:text-amber-700 underline"
-                  >
-                    Force Registry Re-sync
-                  </button>
+                  <button type="button" onClick={fetchSuppliers} className="text-[9px] font-black uppercase text-amber-600 underline">Re-sync</button>
                 </div>
                 <select 
                   required
@@ -236,17 +227,14 @@ export default function Inventory() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">Registry empty. Add partners in the Financial page first.</p>}
               </div>
 
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Barcode / Lookup</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Barcode</label>
                 <div className="flex gap-2">
                   <input className="flex-1 bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
-                    placeholder="Enter Barcode..." value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} />
-                  <button type="button" onClick={handleBarcodeLookup} className="bg-slate-900 text-amber-500 px-6 rounded-xl font-black text-xs uppercase hover:bg-slate-800 transition-all">
-                    Auto-Lookup
-                  </button>
+                    value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} />
+                  <button type="button" onClick={handleBarcodeLookup} className="bg-slate-900 text-amber-500 px-6 rounded-xl font-black text-xs uppercase hover:bg-slate-800 transition-all">Lookup</button>
                 </div>
               </div>
 
@@ -258,7 +246,7 @@ export default function Inventory() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Type</label>
-                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
+                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold"
                   value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
                   {PRODUCT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -266,7 +254,7 @@ export default function Inventory() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit</label>
-                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
+                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold"
                   value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}>
                   {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
@@ -274,23 +262,23 @@ export default function Inventory() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock Level</label>
-                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
+                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold" 
                   value={formData.current_stock} onChange={e => setFormData({...formData, current_stock: Number(e.target.value)})} />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Buying Price (KES)</label>
-                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Buying Price</label>
+                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold" 
                   value={formData.cost_price} onChange={e => setFormData({...formData, cost_price: Number(e.target.value)})} />
               </div>
 
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest ml-1">Selling Price (POS)</label>
-                <input required type="number" className="w-full bg-amber-50 p-4 rounded-xl border-2 border-amber-200 font-black italic text-slate-900 outline-none focus:border-amber-500" 
+                <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest ml-1">Selling Price</label>
+                <input required type="number" className="w-full bg-amber-50 p-4 rounded-xl border-2 border-amber-200 font-black italic text-slate-900" 
                   value={formData.selling_price} onChange={e => setFormData({...formData, selling_price: Number(e.target.value)})} />
               </div>
 
-              <button type="submit" disabled={loading} className="col-span-2 py-5 bg-slate-900 text-amber-500 font-black rounded-[2rem] shadow-xl hover:bg-slate-800 transition-all uppercase tracking-widest text-sm mt-4">
+              <button type="submit" disabled={loading} className="col-span-2 py-5 bg-slate-900 text-amber-500 font-black rounded-[2rem] shadow-xl uppercase tracking-widest text-sm mt-4">
                 {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Confirm Stock to System'}
               </button>
             </form>
