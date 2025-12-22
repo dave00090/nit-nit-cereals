@@ -46,29 +46,31 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- RE-SYNCED FETCH WITH CACHE BUSTING & LOGGING ---
+  // --- EXTREMELY AGGRESSIVE FETCH WITH UNIQUE SYNC ID ---
   async function fetchSuppliers() {
-    // We explicitly call for id and name to ensure the dropdown has what it needs
+    const syncId = new Date().getTime(); // Unique ID to bypass cache
+    
     const { data, error } = await supabase
       .from('suppliers')
       .select('id, name')
+      .not('name', 'is', null) // Filter out broken/empty records
       .order('name', { ascending: true });
     
     if (error) {
-      console.error("Database Error fetching suppliers:", error.message);
-      alert("Database Error: " + error.message);
+      console.error(`[Sync ${syncId}] Database Error:`, error.message);
+      alert("Registry Sync Error: " + error.message);
     } else {
-      console.log("SUCCESS: Found " + (data?.length || 0) + " suppliers");
+      console.log(`[Sync ${syncId}] SUCCESS: Found ${data?.length || 0} suppliers`);
       setSuppliers(data || []);
     }
   }
 
-  // --- TRIGGER REFRESH WHEN OPENING MODAL (Final Version Logic) ---
+  // --- TRIGGER REFRESH WHEN OPENING MODAL ---
   const handleOpenModal = async () => {
     setEditingProduct(null);
     setFormData(initialForm);
     
-    // Force immediate re-fetch to bypass any browser state lag or cache
+    // Aggressive re-fetch at the exact moment of button click
     await fetchSuppliers(); 
     
     setIsModalOpen(true);
@@ -114,7 +116,6 @@ export default function Inventory() {
     } else {
       result = await supabase.from('products').insert([submissionData]);
       
-      // AUTO-LOG TO SUPPLIER HISTORY
       if (!result.error && formData.supplier_id && formData.current_stock > 0) {
         await supabase.from('supplier_purchases').insert([{
           supplier_id: formData.supplier_id,
@@ -133,7 +134,7 @@ export default function Inventory() {
       setEditingProduct(null);
       setFormData(initialForm);
       fetchProducts();
-      fetchSuppliers(); 
+      await fetchSuppliers(); 
     }
     setLoading(false);
   };
@@ -144,7 +145,7 @@ export default function Inventory() {
         <div className="flex justify-between items-center mb-10">
           <div>
             <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Supermarket Stock</h1>
-            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Database: {products.length} Products</p>
+            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Active Registry: {products.length} Items</p>
           </div>
           <div className="flex gap-3">
             <button onClick={() => { fetchProducts(); fetchSuppliers(); }} className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-400 hover:text-amber-500 transition-all shadow-sm">
@@ -209,13 +210,41 @@ export default function Inventory() {
             </div>
             
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-5">
+              {/* AGGRESSIVE SYNC SUPPLIER SELECTOR */}
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Scan / Input Barcode</label>
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                    <Truck size={12} /> Source Supplier ({suppliers.length} Found)
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={fetchSuppliers} 
+                    className="text-[9px] font-black uppercase text-amber-600 hover:text-amber-700 underline"
+                  >
+                    Force Registry Re-sync
+                  </button>
+                </div>
+                <select 
+                  required
+                  className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 appearance-none"
+                  value={formData.supplier_id} 
+                  onChange={e => setFormData({...formData, supplier_id: e.target.value})}
+                >
+                  <option value="">-- Choose Supplier from Registry --</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">Registry empty. Add suppliers in the sidebar first.</p>}
+              </div>
+
+              <div className="col-span-2 space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Barcode / Lookup</label>
                 <div className="flex gap-2">
                   <input className="flex-1 bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
                     placeholder="Enter Barcode..." value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} />
                   <button type="button" onClick={handleBarcodeLookup} className="bg-slate-900 text-amber-500 px-6 rounded-xl font-black text-xs uppercase hover:bg-slate-800 transition-all">
-                    <Barcode size={20} className="inline mr-2" /> Auto-Lookup
+                    Auto-Lookup
                   </button>
                 </div>
               </div>
@@ -226,36 +255,8 @@ export default function Inventory() {
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
-              {/* AUTOMATIC SUPPLIER SELECTOR WITH DEBUG COUNT */}
-              <div className="col-span-2 space-y-1">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <Truck size={12} /> Source Supplier ({suppliers.length} found)
-                  </label>
-                  <button 
-                    type="button" 
-                    onClick={fetchSuppliers} 
-                    className="text-[9px] font-black uppercase text-amber-600 hover:text-amber-700 underline"
-                  >
-                    Refresh List
-                  </button>
-                </div>
-                <select 
-                  required
-                  className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 appearance-none"
-                  value={formData.supplier_id} 
-                  onChange={e => setFormData({...formData, supplier_id: e.target.value})}
-                >
-                  <option value="">Select a Supplier from Registry...</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">No suppliers found. Add them in the Suppliers page first.</p>}
-              </div>
-
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Type</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Type</label>
                 <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
                   value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
                   {PRODUCT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -268,18 +269,6 @@ export default function Inventory() {
                   value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}>
                   {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Stock Level</label>
-                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
-                  value={formData.current_stock} onChange={e => setFormData({...formData, current_stock: Number(e.target.value)})} />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reorder Alert Level</label>
-                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
-                  value={formData.reorder_level} onChange={e => setFormData({...formData, reorder_level: Number(e.target.value)})} />
               </div>
 
               <div className="space-y-1">

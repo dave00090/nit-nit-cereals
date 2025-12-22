@@ -62,7 +62,8 @@ export default function Suppliers() {
     
     setLoading(true);
 
-    const { error } = await supabase
+    // Using .select() to confirm exactly what the DB saved
+    const { data, error } = await supabase
       .from('suppliers')
       .insert([
         {
@@ -71,12 +72,13 @@ export default function Suppliers() {
           phone: formData.phone,
           category: formData.category
         }
-      ]);
+      ])
+      .select();
 
     if (error) {
-      alert("Error: " + error.message);
-    } else {
-      alert("SUCCESS: " + formData.name + " added to Registry!");
+      alert("Database Error: " + error.message);
+    } else if (data && data.length > 0) {
+      alert("SUCCESS: " + data[0].name + " added to Registry!");
       setIsModalOpen(false);
       setFormData({ name: '', contact_person: '', phone: '', category: 'Wholesaler' });
       fetchData(); // Refresh the local list immediately
