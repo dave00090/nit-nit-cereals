@@ -46,7 +46,7 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- DEBUGGED FETCH SUPPLIERS ---
+  // --- AUTOMATED FETCH FROM SUPPLIERS PAGE ---
   async function fetchSuppliers() {
     const { data, error } = await supabase
       .from('suppliers')
@@ -54,12 +54,12 @@ export default function Inventory() {
       .order('name', { ascending: true });
     
     if (error) {
-      alert("Database Error fetching suppliers: " + error.message);
+      console.error("Database Error fetching suppliers: " + error.message);
       return;
     }
 
     if (data) {
-      console.log("Suppliers loaded:", data);
+      console.log("Suppliers loaded from registry:", data);
       setSuppliers(data);
     }
   }
@@ -68,7 +68,7 @@ export default function Inventory() {
   const handleOpenModal = () => {
     setEditingProduct(null);
     setFormData(initialForm);
-    fetchSuppliers(); // RE-FETCH AT MOMENT OF OPENING TO ENSURE SYNC
+    fetchSuppliers(); // ENSURE SYNC WITH SUPPLIERS PAGE
     setIsModalOpen(true);
   };
 
@@ -223,14 +223,27 @@ export default function Inventory() {
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
-              {/* UPDATED SUPPLIER SELECTOR WITH DEBUG COUNT */}
+              {/* AUTOMATIC SUPPLIER SELECTOR */}
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                  <Truck size={12} /> Source Supplier ({suppliers.length} found)
-                </label>
-                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 appearance-none"
-                  value={formData.supplier_id} onChange={e => setFormData({...formData, supplier_id: e.target.value})}>
-                  <option value="">Select a Supplier...</option>
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                    <Truck size={12} /> Source Supplier ({suppliers.length} found)
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={fetchSuppliers} 
+                    className="text-[9px] font-black uppercase text-amber-600 hover:text-amber-700 underline"
+                  >
+                    Refresh List
+                  </button>
+                </div>
+                <select 
+                  required
+                  className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 appearance-none"
+                  value={formData.supplier_id} 
+                  onChange={e => setFormData({...formData, supplier_id: e.target.value})}
+                >
+                  <option value="">Select a Supplier from Registry...</option>
                   {suppliers.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
