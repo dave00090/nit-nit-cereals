@@ -82,7 +82,7 @@ export default function Suppliers() {
   };
 
   const deleteSupplier = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}? This will also remove their supply history.`)) return;
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
     
     const { error } = await supabase
       .from('distributors')
@@ -116,7 +116,6 @@ export default function Suppliers() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* LEFT COLUMN: LIST */}
           <div className="lg:col-span-1 space-y-4">
             <div className="relative mb-6">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -133,38 +132,36 @@ export default function Suppliers() {
               {suppliers
                 .filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
                 .map(sup => (
-                <div key={sup.id} className="bg-white rounded-[2rem] border-2 border-slate-200 p-6 shadow-sm flex flex-col gap-4">
-                  
-                  {/* Partner Info Section */}
+                <div key={sup.id} className="bg-white rounded-[2rem] border-2 border-red-500 p-6 shadow-md flex flex-col gap-4">
+                  {/* Card Content */}
                   <div className="flex-1">
                     <p className="text-[9px] font-black uppercase mb-1 tracking-widest text-amber-600">
                       {sup.category || 'Partner'}
                     </p>
-                    <h4 className="font-black uppercase text-lg italic leading-tight truncate">{sup.name}</h4>
+                    <h4 className="font-black uppercase text-lg italic leading-tight truncate">
+                      {sup.name ?? 'Unnamed Partner'}
+                    </h4>
                     <p className="mt-2 text-xs font-bold text-slate-500 flex items-center gap-1">
-                       <Phone size={12} /> {sup.phone}
+                       <Phone size={12} /> {sup.phone ?? 'No Phone'}
                     </p>
                   </div>
 
-                  {/* BULLETPROOF ACTION BUTTONS ROW */}
-                  <div className="flex gap-2 pt-4 border-t border-slate-50">
+                  {/* ACTION BUTTONS - FORCED VISIBILITY */}
+                  <div className="flex gap-2 pt-2 border-t border-slate-100">
                     <button 
                       onClick={() => setSelectedSupplier(sup)}
-                      className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${
-                        selectedSupplier?.id === sup.id 
-                        ? 'bg-slate-900 text-white' 
-                        : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
-                      }`}
+                      className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2"
                     >
                       View Profile <ChevronRight size={14} />
                     </button>
                     
                     <button 
-                      onClick={() => deleteSupplier(sup.id, sup.name)}
-                      className="px-4 py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center border border-red-100 shadow-sm"
+                      onClick={() => deleteSupplier(sup.id, sup.name ?? 'this partner')}
+                      className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center shadow-lg transition-all"
+                      style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
                       title="Delete Partner"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={20} strokeWidth={3} />
                     </button>
                   </div>
                 </div>
@@ -172,7 +169,6 @@ export default function Suppliers() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: DETAILS */}
           <div className="lg:col-span-2">
             {selectedSupplier ? (
               <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
@@ -193,45 +189,9 @@ export default function Suppliers() {
                     <Trash2 size={18} /> Delete Account
                   </button>
                 </div>
-
                 <div className="p-10">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-2">
-                    <Package size={16} className="text-amber-500" /> Procurement History
-                  </h3>
-                  
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                          <th className="pb-4">Date</th>
-                          <th className="pb-4">Item</th>
-                          <th className="pb-4">Quantity</th>
-                          <th className="pb-4 text-right">Total (KES)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50 font-bold text-sm">
-                        {purchases.filter(p => p.supplier_id === selectedSupplier.id).length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="py-20 text-center opacity-20 flex flex-col items-center">
-                                <Package size={48} strokeWidth={1} />
-                                <p className="font-black uppercase text-xs mt-2 tracking-widest">No Supply Records Found</p>
-                            </td>
-                          </tr>
-                        ) : (
-                          purchases.filter(p => p.supplier_id === selectedSupplier.id).map(record => (
-                            <tr key={record.id} className="group hover:bg-slate-50/50 transition-colors">
-                              <td className="py-5 text-xs text-slate-500">{record.purchase_date}</td>
-                              <td className="py-5 font-black uppercase">{record.product_name}</td>
-                              <td className="py-5">{record.quantity} Units</td>
-                              <td className="py-5 text-right text-emerald-600 font-black">
-                                KES {record.total_cost.toLocaleString()}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-8">History</h3>
+                   <p className="text-center py-10 text-slate-400 italic">History records for {selectedSupplier.name} will appear here.</p>
                 </div>
               </div>
             ) : (
@@ -246,51 +206,21 @@ export default function Suppliers() {
         </div>
       </div>
 
-      {/* MODAL: ADD SUPPLIER */}
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[3rem] w-full max-w-lg p-10 shadow-2xl animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-10 text-slate-900">
               <h2 className="text-2xl font-black uppercase italic tracking-tighter">Register New Partner</h2>
-              <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-red-500 transition-colors">
+              <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-red-500">
                 <X size={20}/>
               </button>
             </div>
-            
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Name</label>
-                <input required className="w-full bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500 transition-all" 
-                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
-                  <input className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
-                    value={formData.contact_person} onChange={e => setFormData({...formData, contact_person: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</label>
-                  <input className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
-                    value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
-                <select className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500"
-                  value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                  <option value="Wholesaler">Wholesaler</option>
-                  <option value="Farmer">Farmer</option>
-                  <option value="Distributor">Distributor</option>
-                  <option value="Importer">Importer</option>
-                </select>
-              </div>
-
-              <button type="submit" disabled={loading}
-                className="w-full py-5 bg-slate-900 text-amber-500 font-black rounded-[2rem] uppercase tracking-widest text-sm shadow-xl hover:bg-slate-800 transition-all mt-4">
-                {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Register Partner'}
+              <input required placeholder="Company Name" className="w-full bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 font-bold outline-none" 
+                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <button type="submit" className="w-full py-5 bg-slate-900 text-amber-500 font-black rounded-[2rem] uppercase tracking-widest text-sm shadow-xl mt-4">
+                Register Partner
               </button>
             </form>
           </div>
