@@ -46,21 +46,21 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- EXTREMELY AGGRESSIVE FETCH WITH UNIQUE SYNC ID ---
+  // --- EXTREMELY AGGRESSIVE FETCH POINTED TO DISTRIBUTORS TABLE ---
   async function fetchSuppliers() {
     const syncId = new Date().getTime(); // Unique ID to bypass cache
     
     const { data, error } = await supabase
-      .from('suppliers')
+      .from('distributors') // TARGETING YOUR REAL PARTNER TABLE
       .select('id, name')
-      .not('name', 'is', null) // Filter out broken/empty records
+      .not('name', 'is', null) 
       .order('name', { ascending: true });
     
     if (error) {
-      console.error(`[Sync ${syncId}] Database Error:`, error.message);
-      alert("Registry Sync Error: " + error.message);
+      console.error(`[Sync ${syncId}] Registry Error:`, error.message);
+      alert("Partner Sync Error: " + error.message);
     } else {
-      console.log(`[Sync ${syncId}] SUCCESS: Found ${data?.length || 0} suppliers`);
+      console.log(`[Sync ${syncId}] SUCCESS: Found ${data?.length || 0} partners`);
       setSuppliers(data || []);
     }
   }
@@ -144,8 +144,8 @@ export default function Inventory() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Supermarket Stock</h1>
-            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Active Registry: {products.length} Items</p>
+            <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Nit-Nit Inventory</h1>
+            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Active Stock: {products.length} Items</p>
           </div>
           <div className="flex gap-3">
             <button onClick={() => { fetchProducts(); fetchSuppliers(); }} className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-400 hover:text-amber-500 transition-all shadow-sm">
@@ -205,16 +205,17 @@ export default function Inventory() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-black text-slate-900 uppercase italic">{editingProduct ? 'Edit Variety' : 'Add New Product'}</h2>
+              <h2 className="text-2xl font-black text-slate-900 uppercase italic">{editingProduct ? 'Edit variety' : 'Register New Product'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
             </div>
             
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-5">
-              {/* AGGRESSIVE SYNC SUPPLIER SELECTOR */}
+              
+              {/* SYNCED PARTNER SELECTOR */}
               <div className="col-span-2 space-y-1">
                 <div className="flex justify-between items-center px-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <Truck size={12} /> Source Supplier ({suppliers.length} Found)
+                    <Truck size={12} /> Source Partner ({suppliers.length} found)
                   </label>
                   <button 
                     type="button" 
@@ -230,12 +231,12 @@ export default function Inventory() {
                   value={formData.supplier_id} 
                   onChange={e => setFormData({...formData, supplier_id: e.target.value})}
                 >
-                  <option value="">-- Choose Supplier from Registry --</option>
+                  <option value="">-- Choose Partner (AA, Al-Jazer, etc) --</option>
                   {suppliers.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">Registry empty. Add suppliers in the sidebar first.</p>}
+                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">Registry empty. Add partners in the Financial page first.</p>}
               </div>
 
               <div className="col-span-2 space-y-1">
@@ -272,12 +273,18 @@ export default function Inventory() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Buying Price (Cost)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock Level</label>
+                <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
+                  value={formData.current_stock} onChange={e => setFormData({...formData, current_stock: Number(e.target.value)})} />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Buying Price (KES)</label>
                 <input required type="number" className="w-full bg-slate-50 p-4 rounded-xl border-2 border-slate-100 font-bold outline-none focus:border-amber-500" 
                   value={formData.cost_price} onChange={e => setFormData({...formData, cost_price: Number(e.target.value)})} />
               </div>
 
-              <div className="space-y-1">
+              <div className="col-span-2 space-y-1">
                 <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest ml-1">Selling Price (POS)</label>
                 <input required type="number" className="w-full bg-amber-50 p-4 rounded-xl border-2 border-amber-200 font-black italic text-slate-900 outline-none focus:border-amber-500" 
                   value={formData.selling_price} onChange={e => setFormData({...formData, selling_price: Number(e.target.value)})} />
