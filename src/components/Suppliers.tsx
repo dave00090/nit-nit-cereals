@@ -85,7 +85,7 @@ export default function Suppliers() {
     setLoading(false);
   };
 
-  // --- FIXED INDIVIDUAL DELETE WORKING ---
+  // --- FIXED INDIVIDUAL DELETE WORKING & ALWAYS VISIBLE ---
   const deleteSupplier = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}? This will also remove their supply history.`)) return;
     
@@ -97,7 +97,7 @@ export default function Suppliers() {
     if (error) {
       alert("Delete failed: " + error.message);
     } else {
-      setSelectedSupplier(null);
+      if (selectedSupplier?.id === id) setSelectedSupplier(null);
       // Update UI immediately
       setSuppliers(suppliers.filter(s => s.id !== id));
     }
@@ -138,36 +138,35 @@ export default function Suppliers() {
 
             <div className="space-y-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
               {suppliers
-                .filter(s => s.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
                 .map(sup => (
                 <div key={sup.id} className="relative group">
                   <button 
                     onClick={() => setSelectedSupplier(sup)}
-                    className={`w-full text-left p-6 rounded-[2rem] border transition-all ${
+                    className={`w-full text-left p-6 pr-14 rounded-[2rem] border transition-all ${
                       selectedSupplier?.id === sup.id 
                       ? 'bg-slate-900 border-slate-900 text-white shadow-2xl' 
                       : 'bg-white border-slate-200 text-slate-900 hover:border-amber-500'
                     }`}
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className={`text-[9px] font-black uppercase mb-1 tracking-widest ${selectedSupplier?.id === sup.id ? 'text-amber-500' : 'text-slate-400'}`}>
-                          {sup.category || 'Partner'}
-                        </p>
-                        <h4 className="font-black uppercase text-lg italic leading-tight">{sup.name}</h4>
+                    <div>
+                      <p className={`text-[9px] font-black uppercase mb-1 tracking-widest ${selectedSupplier?.id === sup.id ? 'text-amber-500' : 'text-slate-400'}`}>
+                        {sup.category || 'Partner'}
+                      </p>
+                      <h4 className="font-black uppercase text-lg italic leading-tight truncate">{sup.name}</h4>
+                      <div className="mt-4 flex items-center gap-4 text-[11px] font-bold opacity-70">
+                        <span className="flex items-center gap-1"><Phone size={14} /> {sup.phone}</span>
                       </div>
-                    </div>
-                    <div className="mt-4 flex items-center gap-4 text-[11px] font-bold opacity-70">
-                      <span className="flex items-center gap-1"><Phone size={14} /> {sup.phone}</span>
                     </div>
                   </button>
                   
-                  {/* INDIVIDUAL DELETE BUTTON ON CARD */}
+                  {/* RED DELETE BUTTON - ALWAYS VISIBLE */}
                   <button 
                     onClick={(e) => { e.stopPropagation(); deleteSupplier(sup.id, sup.name); }}
-                    className="absolute top-4 right-4 p-2 bg-red-50 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                    className="absolute top-6 right-6 p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100"
+                    title="Delete Partner"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               ))}
@@ -192,10 +191,9 @@ export default function Suppliers() {
                        </span>
                     </div>
                   </div>
-                  {/* HEADER DELETE BUTTON */}
                   <button 
                     onClick={() => deleteSupplier(selectedSupplier.id, selectedSupplier.name)}
-                    className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 font-black text-xs uppercase"
+                    className="p-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all flex items-center gap-2 font-black text-xs uppercase shadow-lg"
                   >
                     <Trash2 size={20} /> Delete Partner
                   </button>
