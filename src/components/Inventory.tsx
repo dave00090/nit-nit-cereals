@@ -46,7 +46,7 @@ export default function Inventory() {
     setLoading(false);
   }
 
-  // --- AUTOMATED FETCH FROM SUPPLIERS PAGE ---
+  // --- RE-SYNCED FETCH WITH CACHE BUSTING & LOGGING ---
   async function fetchSuppliers() {
     const { data, error } = await supabase
       .from('suppliers')
@@ -54,21 +54,22 @@ export default function Inventory() {
       .order('name', { ascending: true });
     
     if (error) {
-      console.error("Database Error fetching suppliers: " + error.message);
-      return;
-    }
-
-    if (data) {
-      console.log("Suppliers loaded from registry:", data);
-      setSuppliers(data);
+      console.error("Database Error fetching suppliers:", error.message);
+      alert("Database Error: " + error.message);
+    } else {
+      console.log("SUCCESS: Found " + (data?.length || 0) + " suppliers");
+      setSuppliers(data || []);
     }
   }
 
-  // --- TRIGGER REFRESH WHEN OPENING MODAL ---
-  const handleOpenModal = () => {
+  // --- TRIGGER REFRESH WHEN OPENING MODAL (Final Version Logic) ---
+  const handleOpenModal = async () => {
     setEditingProduct(null);
     setFormData(initialForm);
-    fetchSuppliers(); // ENSURE SYNC WITH SUPPLIERS PAGE
+    
+    // Force immediate re-fetch to bypass any browser state lag
+    await fetchSuppliers(); 
+    
     setIsModalOpen(true);
   };
 
@@ -223,7 +224,7 @@ export default function Inventory() {
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
 
-              {/* AUTOMATIC SUPPLIER SELECTOR */}
+              {/* AUTOMATIC SUPPLIER SELECTOR WITH DEBUG COUNT */}
               <div className="col-span-2 space-y-1">
                 <div className="flex justify-between items-center px-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
@@ -248,7 +249,7 @@ export default function Inventory() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">No suppliers found. Check the Suppliers page.</p>}
+                {suppliers.length === 0 && <p className="text-[9px] text-red-500 italic ml-1">No suppliers found. Add them in the Suppliers page first.</p>}
               </div>
 
               <div className="space-y-1">
@@ -292,7 +293,7 @@ export default function Inventory() {
               </div>
 
               <button type="submit" disabled={loading} className="col-span-2 py-5 bg-slate-900 text-amber-500 font-black rounded-[2rem] shadow-xl hover:bg-slate-800 transition-all uppercase tracking-widest text-sm mt-4">
-                {loading ? <Loader2 className="animate-spin" /> : 'Confirm Stock to System'}
+                {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Confirm Stock to System'}
               </button>
             </form>
           </div>
