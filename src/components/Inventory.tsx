@@ -68,7 +68,7 @@ export default function Inventory() {
   const handleOpenModal = () => {
     setEditingProduct(null);
     setFormData(initialForm);
-    fetchSuppliers(); // RE-FETCH AT MOMENT OF OPENING
+    fetchSuppliers(); // RE-FETCH AT MOMENT OF OPENING TO ENSURE SYNC
     setIsModalOpen(true);
   };
 
@@ -160,7 +160,6 @@ export default function Inventory() {
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
 
-        {/* PRODUCT GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.barcode || '').includes(searchTerm)).map(product => (
             <div key={product.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm hover:border-amber-500 transition-all group relative overflow-hidden">
@@ -171,15 +170,18 @@ export default function Inventory() {
                   <div className={`h-1.5 w-1.5 rounded-full ${Number(product.current_stock) <= Number(product.reorder_level) ? 'bg-red-600 animate-pulse' : 'bg-emerald-600'}`} />
                   {Number(product.current_stock) <= Number(product.reorder_level) ? 'Low Stock' : 'In Stock'}
                 </div>
+                
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => { setEditingProduct(product); setFormData(product); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-500 transition-colors"><Edit3 size={18}/></button>
                   <button onClick={async () => { if(confirm('Delete?')) { await supabase.from('products').delete().eq('id', product.id); fetchProducts(); }}} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                 </div>
               </div>
+
               <h3 className="text-xl font-black text-slate-900 uppercase truncate mb-1">{product.name}</h3>
               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">
                 {product.category || 'Rice'} • {product.unit || 'Pieces'}
               </p>
+              
               <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-4 flex justify-between items-end">
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Stock</p>
